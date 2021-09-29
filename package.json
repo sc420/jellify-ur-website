@@ -1,0 +1,17 @@
+{
+  "name": "jellify-ur-website",
+  "version": "1.0.0",
+  "description": "Use physics simulator to transform a website",
+  "main": "index.js",
+  "dependencies": {},
+  "devDependencies": {
+    "eslint": "^7.32.0",
+    "eslint-config-airbnb-base": "^14.2.1",
+    "eslint-plugin-import": "^2.24.2"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Shawn Chang",
+  "license": "ISC"
+}
