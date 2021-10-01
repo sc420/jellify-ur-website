@@ -1,7 +1,7 @@
 /* global $, Matter */
 /* eslint arrow-body-style: "off" */
 /* eslint max-classes-per-file: "off" */
-/* eslint no-console: ["error", { allow: ["info"] }] */
+/* eslint no-console: ["error", { allow: ["info", "debug"] }] */
 
 (() => {
   class RectUtil {
@@ -26,11 +26,12 @@
       for (let i = 0; i < siblings.length; i += 1) {
         const sibling = siblings[i];
         if (sibling === element) {
-          return `${XPathUtil.getPathTo(element.parentNode)}/${
-            element.tagName
-          }[${ix + 1}]`;
+          const basePath = XPathUtil.getPathTo(element.parentNode);
+          return `${basePath}/${element.tagName}[${ix + 1}]`;
         }
-        if (sibling.nodeType === 1 && sibling.tagName === element.tagName) ix += 1;
+        if (sibling.nodeType === 1 && sibling.tagName === element.tagName) {
+          ix += 1;
+        }
       }
       return '';
     }
@@ -42,41 +43,43 @@
 
       this.parent = null;
       this.children = [];
+      // Children nodes that are visually contained by this node
+      this.visualChildren = [];
 
-      this.cachedBoundingRect = null;
+      this.cachedID = null;
+      this.cachedBoundingBox = null;
     }
 
     isVisible() {
       if (!this.$el.is(':visible')) return false;
-      const rect = this.getBoundingBox();
-      if (rect.width <= 0 || rect.height <= 0) return false;
+      const box = this.getBoundingBox();
+      if (box.width <= 0 || box.height <= 0) return false;
       return true;
     }
 
     isRoot() {
-      return this.parent === null;
+      return !this.parent;
     }
 
     isLeaf() {
       return this.children.length === 0;
     }
 
-    setParent(parentNode) {
-      this.parent = parentNode;
-      if (parentNode) {
-        parentNode.children.push(this);
-      }
+    setParent(node) {
+      this.parent = node;
     }
 
-    removeChild(childNode) {
-      const index = this.children.indexOf(childNode);
-      if (index >= 0) {
-        this.children.splice(index, 1);
-        childNode.setParent(null);
-      }
+    addChild(node) {
+      this.children.push(node);
+    }
+
+    addVisualChild(node) {
+      this.visualChildren.push(node);
     }
 
     render() {
+      if (!this.isVisible()) return;
+
       const borderStyle = this.isLeaf() ? 'solid' : 'dotted';
       const borderColor = this.isLeaf() ? 'red' : 'blue';
       // Reference: https://stackoverflow.com/a/26206753
@@ -84,12 +87,19 @@
       this.$el.css('outline-offset', '-1px');
     }
 
+    getID() {
+      if (!this.cachedID) {
+        this.cachedID = XPathUtil.getPathTo(this.$el.get(0));
+      }
+      return this.cachedID;
+    }
+
     getBoundingBox() {
-      if (!this.cachedBoundingRect) {
+      if (!this.cachedBoundingBox) {
         const rect = this.$el.get(0).getBoundingClientRect();
         const sx = window.scrollX;
         const sy = window.scrollY;
-        this.cachedBoundingRect = new DOMRect(
+        this.cachedBoundingBox = new DOMRect(
           sx + rect.x,
           sy + rect.y,
           rect.width,
@@ -97,109 +107,98 @@
         );
       }
 
-      return this.cachedBoundingRect;
+      return this.cachedBoundingBox;
     }
   }
 
   class TreeManager {
     constructor() {
       this.rootNode = null;
+
+      this.treeNodeCount = 0;
+      this.visibleTreeNodeCount = 0;
     }
 
-    buildTreeNodes() {
+    init() {
       const $body = $('body');
-      this.rootNode = TreeManager.buildTreeNode($body);
-      TreeManager.removeInvisibleLeafNodes(this.rootNode);
-      TreeManager.removeIntermediateInvisibleNodes(this.rootNode);
+      this.rootNode = this.buildTreeNode($body);
+      console.debug(`Created ${this.treeNodeCount} tree nodes`);
+      console.debug(`${this.visibleTreeNodeCount} of tree nodes are visible`);
+
+      TreeManager.buildVisualChildByFindingVisualParent(this.rootNode);
     }
 
-    static buildTreeNode($el) {
+    buildTreeNode($el) {
       const node = new TreeNode($el);
-      const children = $el
+      const childrenElements = $el
         .children()
         .toArray()
         .map((el) => {
           return $(el);
         });
-      const childrenNodes = children.map(($c) => {
-        return TreeManager.buildTreeNode($c);
+
+      // Recursive building
+      const childrenNodes = childrenElements.map(($childEl) => {
+        return this.buildTreeNode($childEl);
       });
-      childrenNodes.forEach((child) => {
-        child.setParent(node);
+
+      // Bind relationship
+      childrenNodes.forEach((childNode) => {
+        node.addChild(childNode);
+        childNode.setParent(node);
       });
+
+      // Accumulate the counters
+      this.treeNodeCount += 1;
+      if (node.isVisible()) {
+        this.visibleTreeNodeCount += 1;
+      }
+
       return node;
     }
 
-    static treeToArray(node) {
-      const list = [];
-      TreeManager.treeToArrayVisit(node, list);
-      return list;
-    }
-
-    static treeToArrayVisit(node, list) {
-      list.push(node);
-      node.children.forEach((c) => {
-        return TreeManager.treeToArrayVisit(c, list);
-      });
-    }
-
-    static removeInvisibleLeafNodes(rootNode) {
-      const nodes = TreeManager.treeToArray(rootNode);
-      let hasChange = true;
-      const notifyChange = () => {
-        hasChange = true;
-      };
-      while (hasChange) {
-        hasChange = false;
-        nodes.forEach((node) => {
-          if (node.isRoot() || !node.isLeaf()) return;
-
-          if (!node.isVisible()) {
-            node.parent.removeChild(node);
-            notifyChange();
-          }
-        });
-      }
-    }
-
-    static removeIntermediateInvisibleNodes(rootNode) {
-      const nodes = TreeManager.treeToArray(rootNode);
-      nodes.forEach((node) => {
-        if (node.isRoot() || !node.isLeaf()) return;
-
-        const boundingBox = node.getBoundingBox();
-        let prevAncestor = null;
-        let curAncestor = node.parent;
-        while (curAncestor !== null) {
-          if (prevAncestor) {
-            // Reattach the node to the current ancestor
-            prevAncestor.removeChild(node);
-            node.setParent(curAncestor);
-          }
-          const ancestorBoundingBox = curAncestor.getBoundingBox();
-          if (RectUtil.contains(ancestorBoundingBox, boundingBox)) break;
-
-          prevAncestor = curAncestor;
-          curAncestor = curAncestor.parent;
+    static buildVisualChildByFindingVisualParent(node) {
+      const boundingBox = node.getBoundingBox();
+      let curAncestorNode = node.parent;
+      while (curAncestorNode) {
+        const ancestorBoundingBox = curAncestorNode.getBoundingBox();
+        if (RectUtil.contains(ancestorBoundingBox, boundingBox)) {
+          curAncestorNode.addVisualChild(node);
+          break;
         }
+
+        curAncestorNode = curAncestorNode.parent;
+      }
+
+      // Recursive building
+      node.children.forEach((childNode) => {
+        TreeManager.buildVisualChildByFindingVisualParent(childNode);
       });
     }
 
     render() {
-      TreeManager.renderTreeNode(this.rootNode);
+      TreeManager.renderVisualChildren(this.rootNode);
     }
 
-    static renderTreeNode(node) {
+    static renderVisualChildren(node) {
       node.render();
-      node.children.forEach((child) => {
-        return TreeManager.renderTreeNode(child);
+      node.visualChildren.forEach((childNode) => {
+        childNode.render();
+      });
+
+      // Recursive rendering
+      node.children.forEach((childNode) => {
+        TreeManager.renderVisualChildren(childNode);
       });
     }
   }
 
   class PhysicsManager {
     constructor() {
-      this.nodeToMatterRect = new Map();
+      this.rects = [];
+      this.diagonalConstraints = [];
+      this.innerConstraints = [];
+      this.nodeIDToRect = {};
     }
 
     init(rootNode) {
@@ -215,15 +214,15 @@
         element: document.body,
         engine: this.engine,
         options: {
-          width: 1000,
-          height: 1000,
+          width: rootNode.getBoundingBox().width,
+          height: rootNode.getBoundingBox().height,
           wireframes: true,
         },
       });
 
       this.mouse = Matter.Mouse.create(this.render.canvas);
 
-      this.matterObjects = this.createMatterObjects(rootNode);
+      this.matterObjects = this.createObjects(rootNode);
       this.mouseConstraint = this.createMouseConstraint();
 
       Matter.Composite.add(this.engine.world, this.matterObjects);
@@ -234,15 +233,18 @@
       Matter.Runner.run(this.runner, this.engine);
     }
 
-    createMatterObjects(rootNode) {
-      // Reset the mapping
-      this.nodeToMatterRect.clear();
+    createObjects(rootNode) {
+      this.rects = [];
+      this.constraints = [];
+      this.nodeIDToRect = {};
 
-      const rects = this.createMatterRects(rootNode);
+      this.buildRect(rootNode);
+      console.debug(`Created ${this.rects.length} rectangles`);
 
-      const constraints = this.createMatterConstraints(rootNode);
+      this.buildConstraints(rootNode);
+      console.debug(`Created ${this.constraints.length} constraints`);
 
-      return [...rects, ...constraints];
+      return [...this.rects, ...this.constraints];
     }
 
     createMouseConstraint() {
@@ -257,121 +259,87 @@
       });
     }
 
-    createMatterRects(node) {
-      let rects = [];
-
-      const rect = PhysicsManager.createMatterRect(node);
-      rects.push(rect);
-      this.nodeToMatterRect.set(node, rect);
-
-      node.children.forEach((childNode) => {
-        const childRects = this.createMatterRects(childNode);
-        rects = [...rects, ...childRects];
-      });
-
-      return rects;
-    }
-
-    createMatterConstraints(node) {
-      let allConstraints = [];
-
-      // Connect the 4 corners of the node to the corners of the children nodes
-      const result = this.createAllDiagonalMatterConstraints(node);
-      const { constraints, excludedCorners } = result;
-      allConstraints = [...allConstraints, ...constraints];
-
-      // Connect the corner points of the children nodes
-      const innerConstraints = this.createInnerMatterConstraints(
-        node.children,
-        excludedCorners,
-      );
-      allConstraints = [...allConstraints, ...innerConstraints];
-
-      // Keep creating the constraints inside each child node
-      node.children.forEach((childNode) => {
-        const childConstraints = this.createMatterConstraints(childNode);
-        allConstraints = [...allConstraints, ...childConstraints];
-      });
-
-      return allConstraints;
-    }
-
-    createAllDiagonalMatterConstraints(node) {
-      if (node.children.length === 0) {
-        return {
-          constraints: [],
-          excludedCorners: [],
-        };
+    buildRect(node) {
+      if (node.isVisible()) {
+        const rect = PhysicsManager.createRect(node);
+        this.rects.push(rect);
+        this.nodeIDToRect[node.getID()] = rect;
       }
 
-      const boundingRect = node.getBoundingBox();
-      const corners = PhysicsManager.getRectCornerPoints(boundingRect);
+      // Recursive building
+      node.children.forEach((childNode) => {
+        this.buildRect(childNode);
+      });
+    }
 
-      let constraints = [];
+    buildConstraints(node) {
+      if (node.isVisible()) {
+        const excludedCorners = this.buildDiagonalConstraints(node);
+
+        this.buildInnerConstraints(node, excludedCorners);
+      }
+
+      // Recursive building
+      node.children.forEach((childNode) => {
+        this.buildConstraints(childNode);
+      });
+    }
+
+    buildDiagonalConstraints(parentNode) {
+      const parentRect = this.nodeIDToRect[parentNode.getID()];
+      const parentBoundingBox = parentNode.getBoundingBox();
+      const corners = PhysicsManager.getCornerPoints(parentBoundingBox);
+
       const excludedCorners = [];
       corners.forEach((corner) => {
-        // eslint-disable-next-line
-        const { nearestNode, nearestCorner } = PhysicsManager.findNearestCorner(
+        const result = PhysicsManager.findNearestCorner(
           corner,
-          node.children,
+          parentNode.visualChildren,
+        );
+        const { nearestNode, nearestCorner, nearestCornerIndex } = result;
+        if (!nearestNode) return;
+
+        const nearestRect = this.nodeIDToRect[nearestNode.getID()];
+        const constraint = PhysicsManager.createConstraint(
+          parentNode,
+          nearestNode,
+          parentRect,
+          nearestRect,
+          corner,
+          nearestCorner,
         );
 
-        // There may be more than 1 corner points with the same coordinates
-        const diagonalConstraints = this.createDiagonalMatterConstraints(
-          node,
-          corner,
-        );
-        constraints = [...constraints, ...diagonalConstraints];
+        this.constraints.push(constraint);
 
-        excludedCorners.push(nearestCorner);
-      });
-      return { constraints, excludedCorners };
-    }
-
-    createDiagonalMatterConstraints(node, corner) {
-      const rect = this.nodeToMatterRect.get(node);
-      const constraints = [];
-      node.children.forEach((childNode) => {
-        const cBoundingRect = childNode.getBoundingBox();
-        const cCorners = PhysicsManager.getRectCornerPoints(cBoundingRect);
-        cCorners.forEach((childCorner) => {
-          if (PhysicsManager.isPointAlmostEqual(corner, childCorner)) {
-            const childRect = this.nodeToMatterRect.get(childNode);
-            const constraint = PhysicsManager.createMatterConstraint(
-              node,
-              childNode,
-              rect,
-              childRect,
-              corner,
-              childCorner,
-            );
-            constraints.push(constraint);
-          }
+        excludedCorners.push({
+          node: nearestNode,
+          cornerIndex: nearestCornerIndex,
         });
       });
-      return constraints;
+      return excludedCorners;
     }
 
-    createInnerMatterConstraints(nodes, excludedCorners) {
-      if (nodes.length <= 1) return [];
+    buildInnerConstraints(parentNode, excludedCorners) {
+      parentNode.visualChildren.forEach((node, nodeIndex) => {
+        const rect = this.nodeIDToRect[node.getID()];
 
-      const constraints = [];
-      nodes.forEach((node) => {
-        const rect = this.nodeToMatterRect.get(node);
-        const otherNodes = [...nodes];
-        otherNodes.splice(nodes.indexOf(node), 1);
+        const otherNodes = [...parentNode.visualChildren];
+        otherNodes.splice(nodeIndex, 1);
 
-        const boundingRect = node.getBoundingBox();
-        const corners = PhysicsManager.getRectCornerPoints(boundingRect);
+        const boundingBox = node.getBoundingBox();
+        const corners = PhysicsManager.getCornerPoints(boundingBox);
 
-        corners.forEach((corner) => {
-          if (PhysicsManager.isPointExcluded(corner, excludedCorners)) return;
+        corners.forEach((corner, cornerIndex) => {
+          if (
+            PhysicsManager.isCornerExcluded(node, cornerIndex, excludedCorners)
+          ) return;
 
           const result = PhysicsManager.findNearestCorner(corner, otherNodes);
           const { nearestNode, nearestCorner } = result;
+          if (!nearestNode) return;
 
-          const nearestRect = this.nodeToMatterRect.get(nearestNode);
-          const constraint = PhysicsManager.createMatterConstraint(
+          const nearestRect = this.nodeIDToRect[nearestNode.getID()];
+          const constraint = PhysicsManager.createConstraint(
             node,
             nearestNode,
             rect,
@@ -379,69 +347,65 @@
             corner,
             nearestCorner,
           );
-          constraints.push(constraint);
+
+          this.constraints.push(constraint);
         });
       });
-      return constraints;
     }
 
-    static findNearestCorner(corner, otherNodes) {
-      if (otherNodes.length === 0) {
-        throw new Error('Should have at least 1 node');
-      }
-      let minDistance = Infinity;
-      let minDistanceNode = null;
-      let minDistanceCorner = null;
+    static findNearestCorner(parentCorner, otherNodes) {
+      let minDist = Infinity;
+      let nearestNode = null;
+      let nearestCorner = null;
+      let nearestCornerIndex = null;
       otherNodes.forEach((otherNode) => {
-        const rect = otherNode.getBoundingBox();
-        const otherCorners = PhysicsManager.getRectCornerPoints(rect);
-        otherCorners.forEach((otherCorner) => {
-          const dist = PhysicsManager.distance(corner, otherCorner);
-          if (dist < minDistance) {
-            minDistance = dist;
-            minDistanceNode = otherNode;
-            minDistanceCorner = otherCorner;
+        const boundingBox = otherNode.getBoundingBox();
+        const otherCorners = PhysicsManager.getCornerPoints(boundingBox);
+        otherCorners.forEach((otherCorner, otherCornerIndex) => {
+          const dist = PhysicsManager.distance(parentCorner, otherCorner);
+          if (dist < minDist) {
+            minDist = dist;
+            nearestNode = otherNode;
+            nearestCorner = otherCorner;
+            nearestCornerIndex = otherCornerIndex;
           }
         });
       });
       return {
-        nearestNode: minDistanceNode,
-        nearestCorner: minDistanceCorner,
+        nearestNode,
+        nearestCorner,
+        nearestCornerIndex,
       };
     }
 
-    static createMatterRect(node) {
-      const options = PhysicsManager.getMatterRectOptions(node);
-      const boundingRect = node.getBoundingBox();
-      const rect = PhysicsManager.boundingToCenterRect(boundingRect);
+    static isCornerExcluded(node, cornerIndex, excludedCorners) {
+      return excludedCorners.some((nodeAndCornerIndex) => {
+        return (
+          node.getID() === nodeAndCornerIndex.node.getID()
+          && cornerIndex === nodeAndCornerIndex.cornerIndex
+        );
+      });
+    }
+
+    static createRect(node) {
+      const options = PhysicsManager.getRectOptions(node);
+      const boundingBox = node.getBoundingBox();
+      const centerBox = PhysicsManager.boundingBoxToCenterBox(boundingBox);
       return Matter.Bodies.rectangle(
-        rect.x,
-        rect.y,
-        rect.width,
-        rect.height,
+        centerBox.x,
+        centerBox.y,
+        centerBox.width,
+        centerBox.height,
         options,
       );
     }
 
-    static createMatterConstraint(
-      nodeA,
-      nodeB,
-      rectA,
-      rectB,
-      cornerA,
-      cornerB,
-    ) {
-      const boundingRectA = nodeA.getBoundingBox();
-      const boundingRectB = nodeB.getBoundingBox();
-      const pointA = PhysicsManager.absToRelativeToCenterPos(
-        cornerA,
-        boundingRectA,
-      );
-      const pointB = PhysicsManager.absToRelativeToCenterPos(
-        cornerB,
-        boundingRectB,
-      );
-      const options = { stiffness: 0.1 };
+    static createConstraint(nodeA, nodeB, rectA, rectB, cornerA, cornerB) {
+      const boundingBoxA = nodeA.getBoundingBox();
+      const boundingBoxB = nodeB.getBoundingBox();
+      const pointA = PhysicsManager.absToRelPos(cornerA, boundingBoxA);
+      const pointB = PhysicsManager.absToRelPos(cornerB, boundingBoxB);
+      const options = { stiffness: 0.01 };
       return Matter.Constraint.create({
         bodyA: rectA,
         pointA,
@@ -451,7 +415,7 @@
       });
     }
 
-    static getMatterRectOptions(node) {
+    static getRectOptions(node) {
       return {
         // Disable collision
         // Reference: https://stackoverflow.com/a/61314389
@@ -459,60 +423,43 @@
           group: -1,
         },
         isStatic: node.isRoot(),
-        label: XPathUtil.getPathTo(node.$el.get(0)),
+        label: node.getID(),
         mass: 1,
       };
     }
 
-    static getRectCornerPoints(boundingRect) {
-      const xRight = boundingRect.x + boundingRect.width;
-      const yBottom = boundingRect.y + boundingRect.height;
+    static getCornerPoints(boundingBox) {
+      const xRight = boundingBox.x + boundingBox.width;
+      const yBottom = boundingBox.y + boundingBox.height;
       return [
-        { x: boundingRect.x, y: boundingRect.y }, // Top-left
-        { x: xRight, y: boundingRect.y }, // Top-right
-        { x: boundingRect.x, y: yBottom }, // Bottom-left
+        { x: boundingBox.x, y: boundingBox.y }, // Top-left
+        { x: xRight, y: boundingBox.y }, // Top-right
+        { x: boundingBox.x, y: yBottom }, // Bottom-left
         { x: xRight, y: yBottom }, // Bottom-right
       ];
     }
 
-    static boundingToCenterRect(boundingRect) {
-      const centerX = boundingRect.x + boundingRect.width / 2;
-      const centerY = boundingRect.y + boundingRect.height / 2;
+    static boundingBoxToCenterBox(boundingBox) {
+      const centerX = boundingBox.x + boundingBox.width / 2;
+      const centerY = boundingBox.y + boundingBox.height / 2;
       return new DOMRect(
         centerX,
         centerY,
-        boundingRect.width,
-        boundingRect.height,
+        boundingBox.width,
+        boundingBox.height,
       );
     }
 
-    static absToRelativeToCenterPos(absPoint, boundingRect) {
-      const centerX = boundingRect.x + boundingRect.width / 2;
-      const centerY = boundingRect.y + boundingRect.height / 2;
-      return { x: absPoint.x - centerX, y: absPoint.y - centerY };
+    static absToRelPos(absPos, boundingBox) {
+      const centerX = boundingBox.x + boundingBox.width / 2;
+      const centerY = boundingBox.y + boundingBox.height / 2;
+      return { x: absPos.x - centerX, y: absPos.y - centerY };
     }
 
     static distance(pos1, pos2) {
       const xDist = pos1.x - pos2.x;
       const yDist = pos1.y - pos2.y;
       return Math.sqrt(xDist * xDist + yDist * yDist);
-    }
-
-    static isPointExcluded(point, excludedPoints) {
-      return excludedPoints.some((excludedPoint) => {
-        return PhysicsManager.isPointAlmostEqual(point, excludedPoint);
-      });
-    }
-
-    static isPointAlmostEqual(pointA, pointB) {
-      return (
-        PhysicsManager.isFloatAlmostEqual(pointA.x, pointB.x)
-        && PhysicsManager.isFloatAlmostEqual(pointA.y, pointB.y)
-      );
-    }
-
-    static isFloatAlmostEqual(num1, num2) {
-      return Math.abs(num1 - num2) < Number.EPSILON;
     }
   }
 
@@ -548,7 +495,7 @@
       $(document).ready(() => {
         this.setLoaded();
 
-        this.treeManager.buildTreeNodes();
+        this.treeManager.init();
 
         if (this.isDebugMode() || true) {
           this.treeManager.render();
