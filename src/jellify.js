@@ -4,14 +4,55 @@
 /* eslint no-console: ["error", { allow: ["info", "debug"] }] */
 
 (() => {
-  class RectUtil {
-    static contains(rect1, rect2) {
+  class GeometryUtil {
+    static containsRect(rect1, rect2, margin = 0) {
       return (
-        rect2.x + rect2.width < rect1.x + rect1.width
-        && rect2.x > rect1.x
-        && rect2.y > rect1.y
-        && rect2.y + rect2.height < rect1.y + rect1.height
+        rect1.x + margin <= rect2.x
+        && rect2.x + rect2.width + margin <= rect1.x + rect1.width
+        && rect1.y + margin <= rect2.y
+        && rect2.y + rect2.height + margin <= rect1.y + rect1.height
       );
+    }
+
+    static containsPoint(rect, point) {
+      const pointAsRect = {
+        x: point.x,
+        y: point.y,
+        width: 0,
+        height: 0,
+      };
+      return GeometryUtil.containsRect(rect, pointAsRect);
+    }
+
+    static getCornerPoints(rect) {
+      const xRight = rect.x + rect.width;
+      const yBottom = rect.y + rect.height;
+      return [
+        { x: rect.x, y: rect.y }, // Top-left
+        { x: xRight, y: rect.y }, // Top-right
+        { x: rect.x, y: yBottom }, // Bottom-left
+        { x: xRight, y: yBottom }, // Bottom-right
+      ];
+    }
+
+    static boundingBoxToCenterBox(boundingBox) {
+      return {
+        x: boundingBox.x + (boundingBox.width / 2.0),
+        y: boundingBox.y + (boundingBox.height / 2.0),
+        width: boundingBox.width,
+        height: boundingBox.height,
+      };
+    }
+
+    static absToRelPos(absPos, boundingBox) {
+      const centerBox = GeometryUtil.boundingBoxToCenterBox(boundingBox);
+      return { x: absPos.x - centerBox.x, y: absPos.y - centerBox.y };
+    }
+
+    static distance(pos1, pos2) {
+      const xDist = pos1.x - pos2.x;
+      const yDist = pos1.y - pos2.y;
+      return Math.sqrt(xDist * xDist + yDist * yDist);
     }
   }
 
@@ -54,13 +95,13 @@
       this.numVisualDescendants = NaN;
       this.visualHeight = NaN;
       this.canBeStartingNode = true;
+      this.isStartingNode = false;
 
       this.cachedID = null;
       this.cachedBoundingBox = null;
     }
 
     isVisible() {
-      if (!this.$el) return false;
       if (!this.$el.is(':visible')) return false;
       const box = this.getBoundingBox();
       if (box.width <= 0 || box.height <= 0) return false;
@@ -103,6 +144,10 @@
       this.canBeStartingNode = false;
     }
 
+    setStartingNode() {
+      this.isStartingNode = true;
+    }
+
     render(borderStyle = 'solid', borderColor = 'red') {
       if (!this.isVisible()) return;
 
@@ -112,7 +157,6 @@
     }
 
     getID() {
-      if (!this.$el) return '';
       if (!this.cachedID) {
         this.cachedID = XPathUtil.getPathTo(this.$el.get(0));
       }
@@ -120,17 +164,16 @@
     }
 
     getBoundingBox() {
-      if (!this.$el) return new DOMRect();
       if (!this.cachedBoundingBox) {
         const rect = this.$el.get(0).getBoundingClientRect();
         const sx = window.scrollX;
         const sy = window.scrollY;
-        this.cachedBoundingBox = new DOMRect(
-          sx + rect.x,
-          sy + rect.y,
-          rect.width,
-          rect.height,
-        );
+        this.cachedBoundingBox = {
+          x: sx + rect.x,
+          y: sy + rect.y,
+          width: rect.width,
+          height: rect.height,
+        };
       }
 
       return this.cachedBoundingBox;
@@ -167,6 +210,7 @@
 
   class TreeManager {
     constructor() {
+      this.minMargin = 1;
       this.minVisualDescendants = 1;
       // We limit the number of visual descendants to boost the performance. If
       // a node has too many visual descendants we won't consider it as the
@@ -265,7 +309,13 @@
       while (curAncestorNode) {
         if (curAncestorNode.isVisible()) {
           const ancestorBoundingBox = curAncestorNode.getBoundingBox();
-          if (RectUtil.contains(ancestorBoundingBox, boundingBox)) {
+          if (
+            GeometryUtil.containsRect(
+              ancestorBoundingBox,
+              boundingBox,
+              this.minMargin,
+            )
+          ) {
             node.setVisualParent(curAncestorNode);
             curAncestorNode.addVisualChild(node);
             this.visualTreeEdgeCount += 1;
@@ -328,6 +378,7 @@
         return;
       }
 
+      node.setStartingNode();
       this.visualStartingNodes.push(node);
 
       // Prevent all children nodes to be visited later on
@@ -435,44 +486,10 @@
       Matter.Composite.add(this.engine.world, objects);
     }
 
-    static findNearestCorner(parentCorner, otherNodes) {
-      let minDist = Infinity;
-      let nearestNode = null;
-      let nearestCorner = null;
-      let nearestCornerIndex = null;
-      otherNodes.forEach((otherNode) => {
-        const boundingBox = otherNode.getBoundingBox();
-        const otherCorners = PhysicsManager.getCornerPoints(boundingBox);
-        otherCorners.forEach((otherCorner, otherCornerIndex) => {
-          const dist = PhysicsManager.distance(parentCorner, otherCorner);
-          if (dist < minDist) {
-            minDist = dist;
-            nearestNode = otherNode;
-            nearestCorner = otherCorner;
-            nearestCornerIndex = otherCornerIndex;
-          }
-        });
-      });
-      return {
-        nearestNode,
-        nearestCorner,
-        nearestCornerIndex,
-      };
-    }
-
-    static isCornerExcluded(node, cornerIndex, excludedCorners) {
-      return excludedCorners.some((nodeAndCornerIndex) => {
-        return (
-          node.getID() === nodeAndCornerIndex.node.getID()
-          && cornerIndex === nodeAndCornerIndex.cornerIndex
-        );
-      });
-    }
-
     static createRectangle(node) {
       const options = PhysicsManager.getRectOptions(node);
       const boundingBox = node.getBoundingBox();
-      const centerBox = PhysicsManager.boundingBoxToCenterBox(boundingBox);
+      const centerBox = GeometryUtil.boundingBoxToCenterBox(boundingBox);
       return Matter.Bodies.rectangle(
         centerBox.x,
         centerBox.y,
@@ -482,16 +499,16 @@
       );
     }
 
-    static createConstraint(nodeA, nodeB, rectA, rectB, cornerA, cornerB) {
+    static createConstraint(nodeA, nodeB, bodyA, bodyB, cornerA, cornerB) {
       const boundingBoxA = nodeA.getBoundingBox();
       const boundingBoxB = nodeB.getBoundingBox();
-      const pointA = PhysicsManager.absToRelPos(cornerA, boundingBoxA);
-      const pointB = PhysicsManager.absToRelPos(cornerB, boundingBoxB);
+      const pointA = GeometryUtil.absToRelPos(cornerA, boundingBoxA);
+      const pointB = GeometryUtil.absToRelPos(cornerB, boundingBoxB);
       const options = { stiffness: 0.01 };
       return Matter.Constraint.create({
-        bodyA: rectA,
+        bodyA,
         pointA,
-        bodyB: rectB,
+        bodyB,
         pointB,
         ...options,
       });
@@ -504,44 +521,10 @@
         collisionFilter: {
           group: -1,
         },
-        isStatic: node.isVisualRoot(),
+        isStatic: node.isStartingNode,
         label: node.getID(),
         mass: 1,
       };
-    }
-
-    static getCornerPoints(boundingBox) {
-      const xRight = boundingBox.x + boundingBox.width;
-      const yBottom = boundingBox.y + boundingBox.height;
-      return [
-        { x: boundingBox.x, y: boundingBox.y }, // Top-left
-        { x: xRight, y: boundingBox.y }, // Top-right
-        { x: boundingBox.x, y: yBottom }, // Bottom-left
-        { x: xRight, y: yBottom }, // Bottom-right
-      ];
-    }
-
-    static boundingBoxToCenterBox(boundingBox) {
-      const centerX = boundingBox.x + boundingBox.width / 2;
-      const centerY = boundingBox.y + boundingBox.height / 2;
-      return new DOMRect(
-        centerX,
-        centerY,
-        boundingBox.width,
-        boundingBox.height,
-      );
-    }
-
-    static absToRelPos(absPos, boundingBox) {
-      const centerX = boundingBox.x + boundingBox.width / 2;
-      const centerY = boundingBox.y + boundingBox.height / 2;
-      return { x: absPos.x - centerX, y: absPos.y - centerY };
-    }
-
-    static distance(pos1, pos2) {
-      const xDist = pos1.x - pos2.x;
-      const yDist = pos1.y - pos2.y;
-      return Math.sqrt(xDist * xDist + yDist * yDist);
     }
   }
 
@@ -621,6 +604,7 @@
       let constraints = [];
       while (!curItem.done) {
         const curNode = curItem.value;
+
         // Build diagonal constraints
         const result = JellifyEngine.buildDiagonalConstraints(
           curNode,
@@ -628,8 +612,8 @@
         );
         const { diagonalConstraints, excludedCorners } = result;
 
-        // Build inner constraints
-        const innerConstraints = JellifyEngine.buildInnerConstraints(
+        // Build inter constraints
+        const interConstraints = JellifyEngine.buildInterConstraints(
           curNode,
           excludedCorners,
           nodeIDToRectangle,
@@ -638,7 +622,7 @@
         constraints = [
           ...constraints,
           ...diagonalConstraints,
-          ...innerConstraints,
+          ...interConstraints,
         ];
 
         curItem = iterator.next();
@@ -649,78 +633,122 @@
     static buildDiagonalConstraints(parentNode, nodeIDToRectangle) {
       const parentRectangle = nodeIDToRectangle[parentNode.getID()];
       const parentBoundingBox = parentNode.getBoundingBox();
-      const corners = PhysicsManager.getCornerPoints(parentBoundingBox);
+      const corners = GeometryUtil.getCornerPoints(parentBoundingBox);
 
       const diagonalConstraints = [];
       const excludedCorners = [];
+      if (parentNode.visualChildren.length === 0) {
+        return { diagonalConstraints, excludedCorners };
+      }
       corners.forEach((corner) => {
-        const result = PhysicsManager.findNearestCorner(
+        const results = JellifyEngine.findNearestCorners(
           corner,
           parentNode.visualChildren,
         );
-        const { nearestNode, nearestCorner, nearestCornerIndex } = result;
-        if (!nearestNode) return;
-
-        const nearestRectangle = nodeIDToRectangle[nearestNode.getID()];
-        const constraint = PhysicsManager.createConstraint(
-          parentNode,
-          nearestNode,
-          parentRectangle,
-          nearestRectangle,
-          corner,
-          nearestCorner,
-        );
-
-        diagonalConstraints.push(constraint);
-
-        excludedCorners.push({
-          node: nearestNode,
-          cornerIndex: nearestCornerIndex,
-        });
-      });
-      return { diagonalConstraints, excludedCorners };
-    }
-
-    static buildInnerConstraints(
-      parentNode,
-      excludedCorners,
-      nodeIDToRectangle,
-    ) {
-      const innerConstraints = [];
-      parentNode.visualChildren.forEach((node, nodeIndex) => {
-        const rectangle = nodeIDToRectangle[node.getID()];
-
-        const otherNodes = [...parentNode.visualChildren];
-        otherNodes.splice(nodeIndex, 1);
-
-        const boundingBox = node.getBoundingBox();
-        const corners = PhysicsManager.getCornerPoints(boundingBox);
-
-        corners.forEach((corner, cornerIndex) => {
-          if (
-            PhysicsManager.isCornerExcluded(node, cornerIndex, excludedCorners)
-          ) {
-            return;
-          }
-
-          const result = PhysicsManager.findNearestCorner(corner, otherNodes);
-          const { nearestNode, nearestCorner } = result;
-          if (!nearestNode) return;
-
+        results.forEach((result) => {
+          const { nearestNode, nearestCorner, nearestCornerIndex } = result;
           const nearestRectangle = nodeIDToRectangle[nearestNode.getID()];
           const constraint = PhysicsManager.createConstraint(
-            node,
+            parentNode,
             nearestNode,
-            rectangle,
+            parentRectangle,
             nearestRectangle,
             corner,
             nearestCorner,
           );
 
-          innerConstraints.push(constraint);
+          diagonalConstraints.push(constraint);
+
+          excludedCorners.push({
+            node: nearestNode,
+            cornerIndex: nearestCornerIndex,
+          });
         });
       });
-      return innerConstraints;
+      return { diagonalConstraints, excludedCorners };
+    }
+
+    static buildInterConstraints(
+      parentNode,
+      excludedCorners,
+      nodeIDToRectangle,
+    ) {
+      const interConstraints = [];
+      if (parentNode.visualChildren.length <= 1) return interConstraints;
+      parentNode.visualChildren.forEach((node, nodeIndex) => {
+        const rectangle = nodeIDToRectangle[node.getID()];
+        const otherNodes = [...parentNode.visualChildren];
+        otherNodes.splice(nodeIndex, 1);
+
+        const boundingBox = node.getBoundingBox();
+        const corners = GeometryUtil.getCornerPoints(boundingBox);
+        corners.forEach((corner, cornerIndex) => {
+          if (
+            JellifyEngine.isCornerExcluded(node, cornerIndex, excludedCorners)
+          ) {
+            return;
+          }
+
+          const results = JellifyEngine.findNearestCorners(
+            corner,
+            otherNodes,
+            boundingBox,
+          );
+          results.forEach((result) => {
+            const { nearestNode, nearestCorner } = result;
+            const nearestRectangle = nodeIDToRectangle[nearestNode.getID()];
+            const constraint = PhysicsManager.createConstraint(
+              node,
+              nearestNode,
+              rectangle,
+              nearestRectangle,
+              corner,
+              nearestCorner,
+            );
+
+            interConstraints.push(constraint);
+          });
+        });
+      });
+      return interConstraints;
+    }
+
+    static findNearestCorners(corner, otherNodes, excludeBoundingBox = null) {
+      let minDist = Infinity;
+      let results = [];
+      otherNodes.forEach((otherNode) => {
+        const boundingBox = otherNode.getBoundingBox();
+        const otherCorners = GeometryUtil.getCornerPoints(boundingBox);
+        otherCorners.forEach((otherCorner, otherCornerIndex) => {
+          if (
+            excludeBoundingBox
+            && GeometryUtil.containsPoint(excludeBoundingBox, otherCorner)
+          ) {
+            return;
+          }
+          const dist = GeometryUtil.distance(corner, otherCorner);
+          if (dist <= minDist) {
+            if (dist < minDist) results = [];
+            results.push({
+              nearestNode: otherNode,
+              nearestCorner: otherCorner,
+              nearestCornerIndex: otherCornerIndex,
+            });
+
+            minDist = dist;
+          }
+        });
+      });
+      return results;
+    }
+
+    static isCornerExcluded(node, cornerIndex, excludedCorners) {
+      return excludedCorners.some((nodeAndCornerIndex) => {
+        return (
+          node.getID() === nodeAndCornerIndex.node.getID()
+          && cornerIndex === nodeAndCornerIndex.cornerIndex
+        );
+      });
     }
   }
 
