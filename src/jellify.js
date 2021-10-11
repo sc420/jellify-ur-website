@@ -43,14 +43,24 @@
 
       this.parent = null;
       this.children = [];
-      // Children nodes that are visually contained by this node
+
+      // Visual parent node should contain the visual children nodes, they are
+      // not necessarily one depth difference but must be ancestor-descendant
+      // relationship
+      this.visualParent = null;
       this.visualChildren = [];
+
+      // Will be calculated after the visual tree is built
+      this.numVisualDescendants = NaN;
+      this.visualHeight = NaN;
+      this.canBeStartingNode = true;
 
       this.cachedID = null;
       this.cachedBoundingBox = null;
     }
 
     isVisible() {
+      if (!this.$el) return false;
       if (!this.$el.is(':visible')) return false;
       const box = this.getBoundingBox();
       if (box.width <= 0 || box.height <= 0) return false;
@@ -61,33 +71,48 @@
       return !this.parent;
     }
 
-    isLeaf() {
-      return this.children.length === 0;
+    isVisualRoot() {
+      return !this.visualParent;
     }
 
-    setParent(node) {
-      this.parent = node;
+    setParent(parentNode) {
+      this.parent = parentNode;
     }
 
-    addChild(node) {
-      this.children.push(node);
+    addChild(childNode) {
+      this.children.push(childNode);
     }
 
-    addVisualChild(node) {
-      this.visualChildren.push(node);
+    setVisualParent(parentNode) {
+      this.visualParent = parentNode;
     }
 
-    render() {
+    addVisualChild(childNode) {
+      this.visualChildren.push(childNode);
+    }
+
+    setNumVisualDescendants(num) {
+      this.numVisualDescendants = num;
+    }
+
+    setVisualHeight(height) {
+      this.visualHeight = height;
+    }
+
+    disallowStartingNode() {
+      this.canBeStartingNode = false;
+    }
+
+    render(borderStyle = 'solid', borderColor = 'red') {
       if (!this.isVisible()) return;
 
-      const borderStyle = this.isLeaf() ? 'solid' : 'dotted';
-      const borderColor = this.isLeaf() ? 'red' : 'blue';
       // Reference: https://stackoverflow.com/a/26206753
       this.$el.css('outline', `1px ${borderStyle} ${borderColor}`);
       this.$el.css('outline-offset', '-1px');
     }
 
     getID() {
+      if (!this.$el) return '';
       if (!this.cachedID) {
         this.cachedID = XPathUtil.getPathTo(this.$el.get(0));
       }
@@ -95,6 +120,7 @@
     }
 
     getBoundingBox() {
+      if (!this.$el) return new DOMRect();
       if (!this.cachedBoundingBox) {
         const rect = this.$el.get(0).getBoundingClientRect();
         const sx = window.scrollX;
@@ -111,24 +137,98 @@
     }
   }
 
+  class TreeVisitor {
+    constructor(rootNode) {
+      this.rootNode = rootNode;
+    }
+
+    * getChildrenIterator() {
+      let queue = [this.rootNode];
+      while (queue.length > 0) {
+        const node = queue.shift();
+        // DFS
+        queue = [...queue, ...node.children];
+
+        yield node;
+      }
+    }
+
+    * getVisualChildrenIterator() {
+      let queue = [this.rootNode];
+      while (queue.length > 0) {
+        const node = queue.shift();
+        // DFS
+        queue = [...queue, ...node.visualChildren];
+
+        yield node;
+      }
+    }
+  }
+
   class TreeManager {
     constructor() {
+      this.minVisualDescendants = 1;
+      // We limit the number of visual descendants to boost the performance. If
+      // a node has too many visual descendants we won't consider it as the
+      // starting node
+      this.maxVisualDescendants = 50;
+      // We limit the height in the visual tree to avoid long stacked rectangles
+      this.maxVisualHeight = 8;
+
+      // The root node is built from "body" tag, we assume the body tag should
+      // visually contain everything else
       this.rootNode = null;
 
+      // Each visual root node represents a visual tree
+      this.visualRootNodes = [];
+      // The root nodes in visual subtrees that we starting animating from
+      this.visualStartingNodes = [];
+
+      // These information are saved just for debugging
       this.treeNodeCount = 0;
       this.visibleTreeNodeCount = 0;
+      this.visualTreeEdgeCount = 0;
     }
 
     init() {
       const $body = $('body');
-      this.rootNode = this.buildTreeNode($body);
+      this.rootNode = this.buildTreeNodes($body);
       console.debug(`Created ${this.treeNodeCount} tree nodes`);
       console.debug(`${this.visibleTreeNodeCount} of tree nodes are visible`);
 
-      TreeManager.buildVisualChildByFindingVisualParent(this.rootNode);
+      TreeManager.iterateChildren(
+        this.rootNode,
+        this.buildVisualTree.bind(this),
+      );
+      console.debug(`Built ${this.visualTreeEdgeCount} visual tree edges`);
+
+      TreeManager.iterateChildren(
+        this.rootNode,
+        this.findVisualRootNodes.bind(this),
+      );
+      console.debug(`Found ${this.visualRootNodes.length} visual root nodes`);
+
+      this.visualRootNodes.forEach((visualRootNode) => {
+        TreeManager.iterateVisualChildren(
+          visualRootNode,
+          this.countVisualDescendants.bind(this),
+        );
+
+        TreeManager.iterateVisualChildren(
+          visualRootNode,
+          this.calcVisualHeight.bind(this),
+        );
+
+        TreeManager.iterateVisualChildren(
+          visualRootNode,
+          this.findVisualStartingNodes.bind(this),
+        );
+      });
+
+      console.debug(`Found ${this.visualStartingNodes.length} starting nodes`);
     }
 
-    buildTreeNode($el) {
+    buildTreeNodes($el) {
       const node = new TreeNode($el);
       const childrenElements = $el
         .children()
@@ -139,7 +239,7 @@
 
       // Recursive building
       const childrenNodes = childrenElements.map(($childEl) => {
-        return this.buildTreeNode($childEl);
+        return this.buildTreeNodes($childEl);
       });
 
       // Bind relationship
@@ -157,48 +257,141 @@
       return node;
     }
 
-    static buildVisualChildByFindingVisualParent(node) {
+    buildVisualTree(node) {
+      if (!node.isVisible()) return;
+
       const boundingBox = node.getBoundingBox();
       let curAncestorNode = node.parent;
       while (curAncestorNode) {
-        const ancestorBoundingBox = curAncestorNode.getBoundingBox();
-        if (RectUtil.contains(ancestorBoundingBox, boundingBox)) {
-          curAncestorNode.addVisualChild(node);
-          break;
+        if (curAncestorNode.isVisible()) {
+          const ancestorBoundingBox = curAncestorNode.getBoundingBox();
+          if (RectUtil.contains(ancestorBoundingBox, boundingBox)) {
+            node.setVisualParent(curAncestorNode);
+            curAncestorNode.addVisualChild(node);
+            this.visualTreeEdgeCount += 1;
+            break;
+          }
         }
 
         curAncestorNode = curAncestorNode.parent;
       }
+    }
 
-      // Recursive building
-      node.children.forEach((childNode) => {
-        TreeManager.buildVisualChildByFindingVisualParent(childNode);
+    findVisualRootNodes(node) {
+      if (!node.isVisualRoot) return;
+      this.visualRootNodes.push(node);
+    }
+
+    countVisualDescendants(node) {
+      // Return the count if this node has been computed
+      if (Number.isFinite(node.numVisualDescendants)) {
+        return node.numVisualDescendants;
+      }
+
+      const count = node.visualChildren.reduce((prevValue, curNode) => {
+        const curValue = this.countVisualDescendants(curNode);
+        return prevValue + curValue;
+      }, 0 /* initialValue */);
+
+      this.countVisualDescendantsTimes += 1;
+
+      // Save the count
+      node.setNumVisualDescendants(count);
+
+      return count + 1;
+    }
+
+    calcVisualHeight(node) {
+      // Return the height if this node has been computed
+      if (Number.isFinite(node.visualHeight)) return node.visualHeight;
+
+      const height = node.visualChildren.reduce((prevValue, curNode) => {
+        const curValue = this.calcVisualHeight(curNode);
+        return Math.max(prevValue, curValue);
+      }, 0 /* initialValue */);
+
+      this.calcVisualHeightTimes += 1;
+
+      // Save the height
+      node.setVisualHeight(height);
+
+      return height + 1;
+    }
+
+    findVisualStartingNodes(node) {
+      if (
+        !node.canBeStartingNode
+        || node.numVisualDescendants < this.minVisualDescendants
+        || node.numVisualDescendants > this.maxVisualDescendants
+        || node.visualHeight > this.maxVisualHeight
+      ) {
+        return;
+      }
+
+      this.visualStartingNodes.push(node);
+
+      // Prevent all children nodes to be visited later on
+      node.visualChildren.forEach((childNode) => {
+        TreeManager.iterateVisualChildren(childNode, (curNode) => {
+          curNode.disallowStartingNode();
+        });
       });
     }
 
     render() {
-      TreeManager.renderVisualChildren(this.rootNode);
+      this.visualStartingNodes.forEach((visualStartingNode) => {
+        TreeManager.renderVisualChildren(visualStartingNode);
+      });
     }
 
-    static renderVisualChildren(node) {
-      node.render();
-      node.visualChildren.forEach((childNode) => {
-        childNode.render();
-      });
+    static iterateChildren(rootNode, fnCallback) {
+      const visitor = new TreeVisitor(rootNode);
+      const iterator = visitor.getChildrenIterator();
+      let curItem = iterator.next();
+      while (!curItem.done) {
+        const curNode = curItem.value;
+        fnCallback(curNode);
 
-      // Recursive rendering
-      node.children.forEach((childNode) => {
-        TreeManager.renderVisualChildren(childNode);
-      });
+        curItem = iterator.next();
+      }
+    }
+
+    static iterateVisualChildren(rootNode, fnCallback) {
+      const visitor = new TreeVisitor(rootNode);
+      const iterator = visitor.getVisualChildrenIterator();
+      let curItem = iterator.next();
+      while (!curItem.done) {
+        const curNode = curItem.value;
+        fnCallback(curNode);
+
+        curItem = iterator.next();
+      }
+    }
+
+    static renderVisualChildren(startingNode) {
+      const visitor = new TreeVisitor(startingNode);
+      const iterator = visitor.getVisualChildrenIterator();
+      let curItem = iterator.next();
+      while (!curItem.done) {
+        const curNode = curItem.value;
+
+        if (curNode.getID() === startingNode.getID()) {
+          curNode.render('solid', 'red');
+        } else {
+          curNode.render('dotted', 'blue');
+        }
+
+        curItem = iterator.next();
+      }
     }
   }
 
   class PhysicsManager {
     constructor() {
-      this.rects = [];
-      this.diagonalConstraints = [];
-      this.innerConstraints = [];
-      this.nodeIDToRect = {};
+      this.engine = null;
+      this.runner = null;
+      this.render = null;
+      this.mouse = null;
     }
 
     init(rootNode) {
@@ -222,32 +415,11 @@
 
       this.mouse = Matter.Mouse.create(this.render.canvas);
 
-      this.matterObjects = this.createObjects(rootNode);
-      this.mouseConstraint = this.createMouseConstraint();
-
-      Matter.Composite.add(this.engine.world, this.matterObjects);
-      Matter.Composite.add(this.engine.world, this.mouseConstraint);
-
-      Matter.Render.run(this.render);
-
       Matter.Runner.run(this.runner, this.engine);
+      Matter.Render.run(this.render);
     }
 
-    createObjects(rootNode) {
-      this.rects = [];
-      this.constraints = [];
-      this.nodeIDToRect = {};
-
-      this.buildRect(rootNode);
-      console.debug(`Created ${this.rects.length} rectangles`);
-
-      this.buildConstraints(rootNode);
-      console.debug(`Created ${this.constraints.length} constraints`);
-
-      return [...this.rects, ...this.constraints];
-    }
-
-    createMouseConstraint() {
+    buildMouseConstraint() {
       return Matter.MouseConstraint.create(this.engine, {
         mouse: this.mouse,
         constraint: {
@@ -259,98 +431,8 @@
       });
     }
 
-    buildRect(node) {
-      if (node.isVisible()) {
-        const rect = PhysicsManager.createRect(node);
-        this.rects.push(rect);
-        this.nodeIDToRect[node.getID()] = rect;
-      }
-
-      // Recursive building
-      node.children.forEach((childNode) => {
-        this.buildRect(childNode);
-      });
-    }
-
-    buildConstraints(node) {
-      if (node.isVisible()) {
-        const excludedCorners = this.buildDiagonalConstraints(node);
-
-        this.buildInnerConstraints(node, excludedCorners);
-      }
-
-      // Recursive building
-      node.children.forEach((childNode) => {
-        this.buildConstraints(childNode);
-      });
-    }
-
-    buildDiagonalConstraints(parentNode) {
-      const parentRect = this.nodeIDToRect[parentNode.getID()];
-      const parentBoundingBox = parentNode.getBoundingBox();
-      const corners = PhysicsManager.getCornerPoints(parentBoundingBox);
-
-      const excludedCorners = [];
-      corners.forEach((corner) => {
-        const result = PhysicsManager.findNearestCorner(
-          corner,
-          parentNode.visualChildren,
-        );
-        const { nearestNode, nearestCorner, nearestCornerIndex } = result;
-        if (!nearestNode) return;
-
-        const nearestRect = this.nodeIDToRect[nearestNode.getID()];
-        const constraint = PhysicsManager.createConstraint(
-          parentNode,
-          nearestNode,
-          parentRect,
-          nearestRect,
-          corner,
-          nearestCorner,
-        );
-
-        this.constraints.push(constraint);
-
-        excludedCorners.push({
-          node: nearestNode,
-          cornerIndex: nearestCornerIndex,
-        });
-      });
-      return excludedCorners;
-    }
-
-    buildInnerConstraints(parentNode, excludedCorners) {
-      parentNode.visualChildren.forEach((node, nodeIndex) => {
-        const rect = this.nodeIDToRect[node.getID()];
-
-        const otherNodes = [...parentNode.visualChildren];
-        otherNodes.splice(nodeIndex, 1);
-
-        const boundingBox = node.getBoundingBox();
-        const corners = PhysicsManager.getCornerPoints(boundingBox);
-
-        corners.forEach((corner, cornerIndex) => {
-          if (
-            PhysicsManager.isCornerExcluded(node, cornerIndex, excludedCorners)
-          ) return;
-
-          const result = PhysicsManager.findNearestCorner(corner, otherNodes);
-          const { nearestNode, nearestCorner } = result;
-          if (!nearestNode) return;
-
-          const nearestRect = this.nodeIDToRect[nearestNode.getID()];
-          const constraint = PhysicsManager.createConstraint(
-            node,
-            nearestNode,
-            rect,
-            nearestRect,
-            corner,
-            nearestCorner,
-          );
-
-          this.constraints.push(constraint);
-        });
-      });
+    addObjects(objects) {
+      Matter.Composite.add(this.engine.world, objects);
     }
 
     static findNearestCorner(parentCorner, otherNodes) {
@@ -387,7 +469,7 @@
       });
     }
 
-    static createRect(node) {
+    static createRectangle(node) {
       const options = PhysicsManager.getRectOptions(node);
       const boundingBox = node.getBoundingBox();
       const centerBox = PhysicsManager.boundingBoxToCenterBox(boundingBox);
@@ -422,7 +504,7 @@
         collisionFilter: {
           group: -1,
         },
-        isStatic: node.isRoot(),
+        isStatic: node.isVisualRoot(),
         label: node.getID(),
         mass: 1,
       };
@@ -463,12 +545,195 @@
     }
   }
 
+  class JellifyEngine {
+    constructor(treeManager, physicsManager) {
+      this.treeManager = treeManager;
+      this.physicsManager = physicsManager;
+    }
+
+    init() {
+      const { rectangles, nodeIDToRectangle } = this.buildAllRectangles();
+      console.debug(`Built ${rectangles.length} rectangles`);
+
+      const constraints = this.buildAllConstraints(nodeIDToRectangle);
+      console.debug(`Built ${constraints.length} constraints`);
+
+      const mouseConstraint = this.physicsManager.buildMouseConstraint();
+
+      this.physicsManager.addObjects(rectangles);
+      this.physicsManager.addObjects(constraints);
+      this.physicsManager.addObjects(mouseConstraint);
+    }
+
+    buildAllRectangles() {
+      let allRectangles = [];
+      let allNodeIDToRectangle = {};
+      this.treeManager.visualStartingNodes.forEach((startingNode) => {
+        const result = JellifyEngine.buildRectangles(startingNode);
+        const { rectangles, nodeIDToRectangle } = result;
+
+        allRectangles = [...allRectangles, ...rectangles];
+        allNodeIDToRectangle = {
+          ...allNodeIDToRectangle,
+          ...nodeIDToRectangle,
+        };
+      });
+      return {
+        rectangles: allRectangles,
+        nodeIDToRectangle: allNodeIDToRectangle,
+      };
+    }
+
+    buildAllConstraints(nodeIDToRectangle) {
+      let allConstraints = [];
+      this.treeManager.visualStartingNodes.forEach((startingNode) => {
+        const constraints = JellifyEngine.buildConstraints(
+          startingNode,
+          nodeIDToRectangle,
+        );
+
+        allConstraints = [...allConstraints, ...constraints];
+      });
+      return allConstraints;
+    }
+
+    static buildRectangles(startingNode) {
+      const visitor = new TreeVisitor(startingNode);
+      const iterator = visitor.getVisualChildrenIterator();
+      let curItem = iterator.next();
+      const rectangles = [];
+      const nodeIDToRectangle = {};
+      while (!curItem.done) {
+        const curNode = curItem.value;
+        const rectangle = PhysicsManager.createRectangle(curNode);
+        rectangles.push(rectangle);
+        nodeIDToRectangle[curNode.getID()] = rectangle;
+
+        curItem = iterator.next();
+      }
+      return { rectangles, nodeIDToRectangle };
+    }
+
+    static buildConstraints(startingNode, nodeIDToRectangle) {
+      const visitor = new TreeVisitor(startingNode);
+      const iterator = visitor.getVisualChildrenIterator();
+      let curItem = iterator.next();
+      let constraints = [];
+      while (!curItem.done) {
+        const curNode = curItem.value;
+        // Build diagonal constraints
+        const result = JellifyEngine.buildDiagonalConstraints(
+          curNode,
+          nodeIDToRectangle,
+        );
+        const { diagonalConstraints, excludedCorners } = result;
+
+        // Build inner constraints
+        const innerConstraints = JellifyEngine.buildInnerConstraints(
+          curNode,
+          excludedCorners,
+          nodeIDToRectangle,
+        );
+
+        constraints = [
+          ...constraints,
+          ...diagonalConstraints,
+          ...innerConstraints,
+        ];
+
+        curItem = iterator.next();
+      }
+      return constraints;
+    }
+
+    static buildDiagonalConstraints(parentNode, nodeIDToRectangle) {
+      const parentRectangle = nodeIDToRectangle[parentNode.getID()];
+      const parentBoundingBox = parentNode.getBoundingBox();
+      const corners = PhysicsManager.getCornerPoints(parentBoundingBox);
+
+      const diagonalConstraints = [];
+      const excludedCorners = [];
+      corners.forEach((corner) => {
+        const result = PhysicsManager.findNearestCorner(
+          corner,
+          parentNode.visualChildren,
+        );
+        const { nearestNode, nearestCorner, nearestCornerIndex } = result;
+        if (!nearestNode) return;
+
+        const nearestRectangle = nodeIDToRectangle[nearestNode.getID()];
+        const constraint = PhysicsManager.createConstraint(
+          parentNode,
+          nearestNode,
+          parentRectangle,
+          nearestRectangle,
+          corner,
+          nearestCorner,
+        );
+
+        diagonalConstraints.push(constraint);
+
+        excludedCorners.push({
+          node: nearestNode,
+          cornerIndex: nearestCornerIndex,
+        });
+      });
+      return { diagonalConstraints, excludedCorners };
+    }
+
+    static buildInnerConstraints(
+      parentNode,
+      excludedCorners,
+      nodeIDToRectangle,
+    ) {
+      const innerConstraints = [];
+      parentNode.visualChildren.forEach((node, nodeIndex) => {
+        const rectangle = nodeIDToRectangle[node.getID()];
+
+        const otherNodes = [...parentNode.visualChildren];
+        otherNodes.splice(nodeIndex, 1);
+
+        const boundingBox = node.getBoundingBox();
+        const corners = PhysicsManager.getCornerPoints(boundingBox);
+
+        corners.forEach((corner, cornerIndex) => {
+          if (
+            PhysicsManager.isCornerExcluded(node, cornerIndex, excludedCorners)
+          ) {
+            return;
+          }
+
+          const result = PhysicsManager.findNearestCorner(corner, otherNodes);
+          const { nearestNode, nearestCorner } = result;
+          if (!nearestNode) return;
+
+          const nearestRectangle = nodeIDToRectangle[nearestNode.getID()];
+          const constraint = PhysicsManager.createConstraint(
+            node,
+            nearestNode,
+            rectangle,
+            nearestRectangle,
+            corner,
+            nearestCorner,
+          );
+
+          innerConstraints.push(constraint);
+        });
+      });
+      return innerConstraints;
+    }
+  }
+
   class App {
     constructor() {
       this.globalBookmarkletName = 'JELLIFY_BOOKMARKLET';
       this.globalDebugName = 'JELLIFY_DEBUG';
       this.treeManager = new TreeManager();
       this.physicsManager = new PhysicsManager();
+      this.jellifyEngine = new JellifyEngine(
+        this.treeManager,
+        this.physicsManager,
+      );
     }
 
     init() {
@@ -482,15 +747,6 @@
       });
     }
 
-    static waitLibraries(onFinish) {
-      const timerId = setInterval(() => {
-        if (window.jQuery && window.Matter) {
-          onFinish();
-          clearInterval(timerId);
-        }
-      }, 100);
-    }
-
     waitPageToBeReady() {
       $(document).ready(() => {
         this.setLoaded();
@@ -502,6 +758,8 @@
         }
 
         this.physicsManager.init(this.treeManager.rootNode);
+
+        this.jellifyEngine.init();
       });
     }
 
@@ -516,6 +774,15 @@
     setLoaded() {
       window[this.globalBookmarkletName] = true;
       console.info('Jellify is loaded');
+    }
+
+    static waitLibraries(onFinish) {
+      const timerId = setInterval(() => {
+        if (window.jQuery && window.Matter) {
+          onFinish();
+          clearInterval(timerId);
+        }
+      }, 100);
     }
   }
 
