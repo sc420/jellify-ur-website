@@ -14,31 +14,28 @@
       );
     }
 
-    static containsPoint(rect, point) {
-      const pointAsRect = {
-        x: point.x,
-        y: point.y,
-        width: 0,
-        height: 0,
-      };
-      return GeometryUtil.containsRect(rect, pointAsRect);
-    }
-
     static getCornerPoints(rect) {
       const xRight = rect.x + rect.width;
       const yBottom = rect.y + rect.height;
       return [
-        { x: rect.x, y: rect.y }, // Top-left
         { x: xRight, y: rect.y }, // Top-right
+        { x: rect.x, y: rect.y }, // Top-left
         { x: rect.x, y: yBottom }, // Bottom-left
         { x: xRight, y: yBottom }, // Bottom-right
       ];
     }
 
+    static getVector(pos1, pos2) {
+      return {
+        x: pos2.x - pos1.x,
+        y: pos2.y - pos1.y,
+      };
+    }
+
     static boundingBoxToCenterBox(boundingBox) {
       return {
-        x: boundingBox.x + (boundingBox.width / 2.0),
-        y: boundingBox.y + (boundingBox.height / 2.0),
+        x: boundingBox.x + boundingBox.width / 2.0,
+        y: boundingBox.y + boundingBox.height / 2.0,
         width: boundingBox.width,
         height: boundingBox.height,
       };
@@ -53,6 +50,13 @@
       const xDist = pos1.x - pos2.x;
       const yDist = pos1.y - pos2.y;
       return Math.sqrt(xDist * xDist + yDist * yDist);
+    }
+
+    static angle(vector) {
+      // Reference: https://stackoverflow.com/a/35271543
+      const angle = Math.atan2(vector.y, vector.x);
+      const degrees = (180.0 * angle) / Math.PI;
+      return (360.0 + degrees) % 360.0;
     }
   }
 
@@ -215,9 +219,9 @@
       // We limit the number of visual descendants to boost the performance. If
       // a node has too many visual descendants we won't consider it as the
       // starting node
-      this.maxVisualDescendants = 50;
+      this.maxVisualDescendants = 10;
       // We limit the height in the visual tree to avoid long stacked rectangles
-      this.maxVisualHeight = 8;
+      this.maxVisualHeight = 5;
 
       // The root node is built from "body" tag, we assume the body tag should
       // visually contain everything else
@@ -242,7 +246,7 @@
 
       TreeManager.iterateChildren(
         this.rootNode,
-        this.buildVisualTree.bind(this),
+        this.buildVisualChildren.bind(this),
       );
       console.debug(`Built ${this.visualTreeEdgeCount} visual tree edges`);
 
@@ -301,34 +305,38 @@
       return node;
     }
 
-    buildVisualTree(node) {
-      if (!node.isVisible()) return;
+    buildVisualChildren(visualParentNode) {
+      if (!visualParentNode.isVisible()) return;
 
-      const boundingBox = node.getBoundingBox();
-      let curAncestorNode = node.parent;
-      while (curAncestorNode) {
-        if (curAncestorNode.isVisible()) {
-          const ancestorBoundingBox = curAncestorNode.getBoundingBox();
-          if (
-            GeometryUtil.containsRect(
-              ancestorBoundingBox,
-              boundingBox,
-              this.minMargin,
-            )
-          ) {
-            node.setVisualParent(curAncestorNode);
-            curAncestorNode.addVisualChild(node);
-            this.visualTreeEdgeCount += 1;
-            break;
-          }
-        }
+      visualParentNode.children.forEach((childNode) => {
+        this.findVisualChildren(visualParentNode, childNode);
+      });
+    }
 
-        curAncestorNode = curAncestorNode.parent;
+    findVisualChildren(visualParentNode, curNode) {
+      if (!curNode.isVisible()) return;
+
+      if (
+        GeometryUtil.containsRect(
+          visualParentNode.getBoundingBox(),
+          curNode.getBoundingBox(),
+          this.minMargin,
+        )
+      ) {
+        visualParentNode.addVisualChild(curNode);
+        curNode.setVisualParent(visualParentNode);
+        this.visualTreeEdgeCount += 1;
+        return;
       }
+
+      // See if deeper nodes can be visual children
+      curNode.children.forEach((childNode) => {
+        this.findVisualChildren(visualParentNode, childNode);
+      });
     }
 
     findVisualRootNodes(node) {
-      if (!node.isVisualRoot) return;
+      if (!node.isVisualRoot()) return;
       this.visualRootNodes.push(node);
     }
 
@@ -605,17 +613,27 @@
       while (!curItem.done) {
         const curNode = curItem.value;
 
+        let result = {};
         // Build diagonal constraints
-        const result = JellifyEngine.buildDiagonalConstraints(
+        result = JellifyEngine.buildDiagonalConstraints(
           curNode,
           nodeIDToRectangle,
         );
         const { diagonalConstraints, excludedCorners } = result;
 
         // Build inter constraints
-        const interConstraints = JellifyEngine.buildInterConstraints(
+        result = JellifyEngine.buildInterConstraints(
           curNode,
           excludedCorners,
+          nodeIDToRectangle,
+        );
+        const { interConstraints, unconnectedCorners } = result;
+
+        // Fix the unconnected corners by connecting the nearest corner of the
+        // current node and the unconnected corner
+        const fixedConstraints = JellifyEngine.fixUnconnectedCorners(
+          curNode,
+          unconnectedCorners,
           nodeIDToRectangle,
         );
 
@@ -623,6 +641,7 @@
           ...constraints,
           ...diagonalConstraints,
           ...interConstraints,
+          ...fixedConstraints,
         ];
 
         curItem = iterator.next();
@@ -674,7 +693,14 @@
       nodeIDToRectangle,
     ) {
       const interConstraints = [];
-      if (parentNode.visualChildren.length <= 1) return interConstraints;
+      const unconnectedCorners = [];
+      if (parentNode.visualChildren.length <= 1) {
+        return {
+          interConstraints,
+          unconnectedCorners,
+        };
+      }
+
       parentNode.visualChildren.forEach((node, nodeIndex) => {
         const rectangle = nodeIDToRectangle[node.getID()];
         const otherNodes = [...parentNode.visualChildren];
@@ -689,10 +715,12 @@
             return;
           }
 
+          const angleRange = JellifyEngine.getCornerAngleRange(cornerIndex);
           const results = JellifyEngine.findNearestCorners(
             corner,
             otherNodes,
-            boundingBox,
+            angleRange.minAngle,
+            angleRange.maxAngle,
           );
           results.forEach((result) => {
             const { nearestNode, nearestCorner } = result;
@@ -708,34 +736,77 @@
 
             interConstraints.push(constraint);
           });
+
+          // Unable to find another corner to connect, we'll deal with it later
+          if (results.length === 0) {
+            unconnectedCorners.push({
+              node,
+              corner,
+            });
+          }
         });
       });
-      return interConstraints;
+      return { interConstraints, unconnectedCorners };
     }
 
-    static findNearestCorners(corner, otherNodes, excludeBoundingBox = null) {
+    static fixUnconnectedCorners(
+      parentNode,
+      unconnectedCorners,
+      nodeIDToRectangle,
+    ) {
+      const parentRectangle = nodeIDToRectangle[parentNode.getID()];
+
+      const fixedConstraints = [];
+      if (parentNode.visualChildren.length === 0) return fixedConstraints;
+      unconnectedCorners.forEach((unconnectedCorner) => {
+        const { node, corner } = unconnectedCorner;
+        const rectangle = nodeIDToRectangle[node.getID()];
+        const results = JellifyEngine.findNearestCorners(corner, [parentNode]);
+        if (results.length <= 0) throw new Error('Expect at least 1 result');
+        results.forEach((result) => {
+          const { nearestCorner } = result;
+          const constraint = PhysicsManager.createConstraint(
+            parentNode,
+            node,
+            parentRectangle,
+            rectangle,
+            nearestCorner,
+            corner,
+          );
+
+          fixedConstraints.push(constraint);
+        });
+      });
+      return fixedConstraints;
+    }
+
+    static findNearestCorners(
+      corner,
+      otherNodes,
+      minAngle = 0,
+      maxAngle = 360,
+    ) {
       let minDist = Infinity;
       let results = [];
       otherNodes.forEach((otherNode) => {
         const boundingBox = otherNode.getBoundingBox();
         const otherCorners = GeometryUtil.getCornerPoints(boundingBox);
         otherCorners.forEach((otherCorner, otherCornerIndex) => {
-          if (
-            excludeBoundingBox
-            && GeometryUtil.containsPoint(excludeBoundingBox, otherCorner)
-          ) {
-            return;
-          }
+          const vector = GeometryUtil.getVector(corner, otherCorner);
+          const vectorAngle = GeometryUtil.angle(vector);
+          if (!(vectorAngle >= minAngle && vectorAngle <= maxAngle)) return;
+
           const dist = GeometryUtil.distance(corner, otherCorner);
           if (dist <= minDist) {
-            if (dist < minDist) results = [];
+            if (dist < minDist) {
+              minDist = dist;
+              results = [];
+            }
             results.push({
               nearestNode: otherNode,
               nearestCorner: otherCorner,
               nearestCornerIndex: otherCornerIndex,
             });
-
-            minDist = dist;
           }
         });
       });
@@ -749,6 +820,15 @@
           && cornerIndex === nodeAndCornerIndex.cornerIndex
         );
       });
+    }
+
+    static getCornerAngleRange(cornerIndex) {
+      // For example, we prefer quadrant 1 with cornerIndex=0, we prefer
+      // quadrant 2 with cornerIndex=1, and so on
+      return {
+        minAngle: (cornerIndex + 0) * 90,
+        maxAngle: (cornerIndex + 1) * 90,
+      };
     }
   }
 
