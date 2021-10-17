@@ -493,7 +493,7 @@
     }
 
     static createRectangle(node) {
-      const options = PhysicsManager.getRectOptions(node);
+      const options = PhysicsManager.getRectangleOptions(node);
       const boundingBox = node.getBoundingBox();
       const centerBox = GeometryUtil.boundingBoxToCenterBox(boundingBox);
       return Matter.Bodies.rectangle(
@@ -505,12 +505,28 @@
       );
     }
 
+    static createOutermostConstraint(
+      startingNode,
+      staticRect,
+      startingRect,
+      corner,
+    ) {
+      return PhysicsManager.createConstraint(
+        startingNode,
+        startingNode,
+        staticRect,
+        startingRect,
+        corner,
+        corner,
+      );
+    }
+
     static createConstraint(nodeA, nodeB, bodyA, bodyB, cornerA, cornerB) {
       const boundingBoxA = nodeA.getBoundingBox();
       const boundingBoxB = nodeB.getBoundingBox();
       const pointA = GeometryUtil.absToRelPos(cornerA, boundingBoxA);
       const pointB = GeometryUtil.absToRelPos(cornerB, boundingBoxB);
-      const options = { stiffness: 0.01 };
+      const options = PhysicsManager.getConstraintOptions();
       return Matter.Constraint.create({
         bodyA,
         pointA,
@@ -520,7 +536,7 @@
       });
     }
 
-    static getRectOptions(node) {
+    static getRectangleOptions(node) {
       return {
         // Disable collision
         // Reference: https://stackoverflow.com/a/61314389
@@ -531,6 +547,10 @@
         mass: 1,
       };
     }
+
+    static getConstraintOptions() {
+      return { stiffness: 0.01 };
+    }
   }
 
   class JellifyEngine {
@@ -540,24 +560,45 @@
     }
 
     init() {
-      const { rectangles, nodeIDToRectangle } = this.buildAllRectangles();
-      console.debug(`Built ${rectangles.length} rectangles`);
+      const staticRectangles = this.buildAllStaticRectangles();
+      console.debug(`Built ${staticRectangles.length} static rectangles`);
 
-      const constraints = this.buildAllConstraints(nodeIDToRectangle);
-      console.debug(`Built ${constraints.length} constraints`);
+      const dynamicRectResult = this.buildAllDynamicRectangles();
+      const dynamicRectangles = dynamicRectResult.rectangles;
+      const { nodeIDToRectangle } = dynamicRectResult;
+      console.debug(`Built ${dynamicRectangles.length} dynamic rectangles`);
+
+      const outermostConstraints = this.buildAllOutermostConstraints(
+        staticRectangles,
+        nodeIDToRectangle,
+      );
+      console.debug(`Built ${outermostConstraints.length} outermost
+ constraints`);
+
+      const innerConstraints = this.buildAllInnerConstraints(nodeIDToRectangle);
+      console.debug(`Built ${innerConstraints.length} inner constraints`);
 
       const mouseConstraint = this.physicsManager.buildMouseConstraint();
+      console.debug('Built 1 mouse constraint');
 
-      this.physicsManager.addObjects(rectangles);
-      this.physicsManager.addObjects(constraints);
+      this.physicsManager.addObjects(staticRectangles);
+      this.physicsManager.addObjects(dynamicRectangles);
+      this.physicsManager.addObjects(outermostConstraints);
+      this.physicsManager.addObjects(innerConstraints);
       this.physicsManager.addObjects(mouseConstraint);
     }
 
-    buildAllRectangles() {
+    buildAllStaticRectangles() {
+      return this.treeManager.visualStartingNodes.map((startingNode) => {
+        return JellifyEngine.buildStaticRectangle(startingNode);
+      });
+    }
+
+    buildAllDynamicRectangles() {
       let allRectangles = [];
       let allNodeIDToRectangle = {};
       this.treeManager.visualStartingNodes.forEach((startingNode) => {
-        const result = JellifyEngine.buildRectangles(startingNode);
+        const result = JellifyEngine.buildDynamicRectangles(startingNode);
         const { rectangles, nodeIDToRectangle } = result;
 
         allRectangles = [...allRectangles, ...rectangles];
@@ -572,10 +613,34 @@
       };
     }
 
-    buildAllConstraints(nodeIDToRectangle) {
+    buildAllOutermostConstraints(staticRectangles, nodeIDToRectangle) {
+      const allConstraints = [];
+      this.treeManager.visualStartingNodes.forEach((startingNode, index) => {
+        const staticRectangle = staticRectangles[index];
+        const startingRectangle = nodeIDToRectangle[startingNode.getID()];
+
+        const boundingBox = startingNode.getBoundingBox();
+        const corners = GeometryUtil.getCornerPoints(boundingBox);
+
+        corners.forEach((corner) => {
+          // Build diagonal constraints between static rectangle and starting
+          // node rectangle
+          const constraint = PhysicsManager.createOutermostConstraint(
+            startingNode,
+            staticRectangle,
+            startingRectangle,
+            corner,
+          );
+          allConstraints.push(constraint);
+        });
+      });
+      return allConstraints;
+    }
+
+    buildAllInnerConstraints(nodeIDToRectangle) {
       let allConstraints = [];
       this.treeManager.visualStartingNodes.forEach((startingNode) => {
-        const constraints = JellifyEngine.buildConstraints(
+        const constraints = JellifyEngine.buildInnerConstraints(
           startingNode,
           nodeIDToRectangle,
         );
@@ -585,7 +650,7 @@
       return allConstraints;
     }
 
-    static buildRectangles(startingNode) {
+    static buildDynamicRectangles(startingNode) {
       const visitor = new TreeVisitor(startingNode);
       const iterator = visitor.getVisualChildrenIterator();
       let curItem = iterator.next();
@@ -602,7 +667,13 @@
       return { rectangles, nodeIDToRectangle };
     }
 
-    static buildConstraints(startingNode, nodeIDToRectangle) {
+    static buildStaticRectangle(startingNode) {
+      const staticRectangle = PhysicsManager.createRectangle(startingNode);
+      Matter.Body.setStatic(staticRectangle, true);
+      return staticRectangle;
+    }
+
+    static buildInnerConstraints(startingNode, nodeIDToRectangle) {
       const visitor = new TreeVisitor(startingNode);
       const iterator = visitor.getVisualChildrenIterator();
       let curItem = iterator.next();
