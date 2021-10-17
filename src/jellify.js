@@ -89,9 +89,9 @@
       this.parent = null;
       this.children = [];
 
-      // Visual parent node should contain the visual children nodes, they are
-      // not necessarily one depth difference but must be ancestor-descendant
-      // relationship
+      // Visual parent node should "visually" contain the visual children nodes,
+      // they are not necessarily one depth difference but must be
+      // ancestor-descendant relationship
       this.visualParent = null;
       this.visualChildren = [];
 
@@ -223,8 +223,7 @@
       // We limit the height in the visual tree to avoid long stacked rectangles
       this.maxVisualHeight = 5;
 
-      // The root node is built from "body" tag, we assume the body tag should
-      // visually contain everything else
+      // The root node is built from "body" tag
       this.rootNode = null;
 
       // Each visual root node represents a visual tree
@@ -315,6 +314,7 @@
 
     findVisualChildren(visualParentNode, curNode) {
       if (!curNode.isVisible()) return;
+      if (curNode.visualParent) return;
 
       if (
         GeometryUtil.containsRect(
@@ -350,8 +350,6 @@
         const curValue = this.countVisualDescendants(curNode);
         return prevValue + curValue;
       }, 0 /* initialValue */);
-
-      this.countVisualDescendantsTimes += 1;
 
       // Save the count
       node.setNumVisualDescendants(count);
@@ -529,7 +527,6 @@
         collisionFilter: {
           group: -1,
         },
-        isStatic: node.isStartingNode,
         label: node.getID(),
         mass: 1,
       };
