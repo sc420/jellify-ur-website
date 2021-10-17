@@ -18,18 +18,11 @@
       const xRight = rect.x + rect.width;
       const yBottom = rect.y + rect.height;
       return [
-        { x: xRight, y: rect.y }, // Top-right
-        { x: rect.x, y: rect.y }, // Top-left
-        { x: rect.x, y: yBottom }, // Bottom-left
-        { x: xRight, y: yBottom }, // Bottom-right
+        Matter.Vector.create(xRight, rect.y), // Top-right
+        Matter.Vector.create(rect.x, rect.y), // Top-left
+        Matter.Vector.create(rect.x, yBottom), // Bottom-left
+        Matter.Vector.create(xRight, yBottom), // Bottom-right
       ];
-    }
-
-    static getVector(pos1, pos2) {
-      return {
-        x: pos2.x - pos1.x,
-        y: pos2.y - pos1.y,
-      };
     }
 
     static boundingBoxToCenterBox(boundingBox) {
@@ -43,19 +36,17 @@
 
     static absToRelPos(absPos, boundingBox) {
       const centerBox = GeometryUtil.boundingBoxToCenterBox(boundingBox);
-      return { x: absPos.x - centerBox.x, y: absPos.y - centerBox.y };
+      return Matter.Vector.sub(absPos, centerBox);
     }
 
     static distance(pos1, pos2) {
-      const xDist = pos1.x - pos2.x;
-      const yDist = pos1.y - pos2.y;
-      return Math.sqrt(xDist * xDist + yDist * yDist);
+      const diff = Matter.Vector.sub(pos2, pos1);
+      return Matter.Vector.magnitudeSquared(diff);
     }
 
-    static angle(vector) {
-      // Reference: https://stackoverflow.com/a/35271543
-      const angle = Math.atan2(vector.y, vector.x);
-      const degrees = (180.0 * angle) / Math.PI;
+    static angle(vector1, vector2) {
+      const angle = Matter.Vector.angle(vector1, vector2);
+      const degrees = (angle * 180.0) / Math.PI;
       return (360.0 + degrees) % 360.0;
     }
   }
@@ -79,6 +70,27 @@
         }
       }
       return '';
+    }
+  }
+
+  class SmoothVector {
+    constructor(maxSamples) {
+      this.maxSamples = maxSamples;
+
+      this.samples = [];
+    }
+
+    addSample(vector) {
+      if (this.samples.length >= this.maxSamples) this.samples.shift();
+      this.samples.push(vector);
+    }
+
+    getSmoothVector() {
+      const initVector = Matter.Vector.create(0, 0);
+      const accumulatedVector = this.samples.reduce((prevVector, curSample) => {
+        return Matter.Vector.add(prevVector, curSample);
+      }, initVector);
+      return Matter.Vector.div(accumulatedVector, this.samples.length);
     }
   }
 
@@ -150,6 +162,13 @@
 
     setStartingNode() {
       this.isStartingNode = true;
+    }
+
+    setTransform(translation, rotation) {
+      const translateStr = `translate(${translation.x}px, ${translation.y}px)`;
+      const rotationStr = `rotate(${rotation}rad)`;
+
+      this.$el.css('transform', `${translateStr} ${rotationStr}`);
     }
 
     render(borderStyle = 'solid', borderColor = 'red') {
@@ -336,7 +355,7 @@
     }
 
     findVisualRootNodes(node) {
-      if (!node.isVisualRoot()) return;
+      if (!node.isVisible() || !node.isVisualRoot()) return;
       this.visualRootNodes.push(node);
     }
 
@@ -492,17 +511,25 @@
       Matter.Composite.add(this.engine.world, objects);
     }
 
+    static correctForce(force) {
+      // Reference: https://github.com/liabru/matter-js/issues/666#issuecomment-615939507
+      return Matter.Vector.div(force, 1000000);
+    }
+
     static createRectangle(node) {
       const options = PhysicsManager.getRectangleOptions(node);
       const boundingBox = node.getBoundingBox();
       const centerBox = GeometryUtil.boundingBoxToCenterBox(boundingBox);
-      return Matter.Bodies.rectangle(
+      const rectangle = Matter.Bodies.rectangle(
         centerBox.x,
         centerBox.y,
         centerBox.width,
         centerBox.height,
         options,
       );
+
+      Matter.Body.setMass(rectangle, 1.0);
+      return rectangle;
     }
 
     static createOutermostConstraint(
@@ -544,7 +571,6 @@
           group: -1,
         },
         label: node.getID(),
-        mass: 1,
       };
     }
 
@@ -557,35 +583,110 @@
     constructor(treeManager, physicsManager) {
       this.treeManager = treeManager;
       this.physicsManager = physicsManager;
+
+      // Objects
+      this.staticRectangles = null;
+      this.dynamicRectangles = null;
+      this.nodeIDToRectangle = null;
+      this.outermostConstraints = null;
+      this.innerConstraints = null;
+      this.mouseConstraint = null;
+
+      // Positions
+      this.initialPositions = null;
+
+      // Animation
+      this.prevTimestamp = null;
+      this.prevScroll = null;
+      this.smoothWindowAcceleration = new SmoothVector(3);
     }
 
     init() {
-      const staticRectangles = this.buildAllStaticRectangles();
-      console.debug(`Built ${staticRectangles.length} static rectangles`);
+      this.buildAllRectangles();
+
+      this.buildAllConstraints();
+
+      this.mouseConstraint = this.physicsManager.buildMouseConstraint();
+
+      this.saveInitialRectanglePositions();
+
+      this.physicsManager.addObjects(this.staticRectangles);
+      this.physicsManager.addObjects(this.dynamicRectangles);
+      this.physicsManager.addObjects(this.outermostConstraints);
+      this.physicsManager.addObjects(this.innerConstraints);
+      this.physicsManager.addObjects(this.mouseConstraint);
+    }
+
+    runAnimation() {
+      window.requestAnimationFrame(this.stepAnimation.bind(this));
+    }
+
+    stepAnimation(timestamp) {
+      const curScroll = Matter.Vector.create(window.scrollX, window.scrollY);
+
+      if (this.prevTimestamp !== null) {
+        const elapsedSec = (timestamp - this.prevTimestamp) / 1000.0;
+        const scrollDiff = Matter.Vector.sub(curScroll, this.prevScroll);
+        const stepWindowAcceleration = Matter.Vector.div(
+          scrollDiff,
+          elapsedSec,
+        );
+
+        this.smoothWindowAcceleration.addSample(stepWindowAcceleration);
+
+        this.applyForceToStartingNodeRectangles();
+
+        this.updateTransformOnVisualNodes();
+      }
+
+      this.prevTimestamp = timestamp;
+      this.prevScroll = curScroll;
+
+      window.requestAnimationFrame(this.stepAnimation.bind(this));
+    }
+
+    applyForceToStartingNodeRectangles() {
+      const windowAcc = this.smoothWindowAcceleration.getSmoothVector();
+      const negAcc = Matter.Vector.neg(windowAcc);
+
+      this.treeManager.visualStartingNodes.forEach((startingNode) => {
+        // TODO: Use consistent iterator function across this file
+        TreeManager.iterateVisualChildren(startingNode, (node) => {
+          const rectangle = this.nodeIDToRectangle[node.getID()];
+
+          const applyPosition = rectangle.position;
+
+          const force = Matter.Vector.mult(negAcc, rectangle.mass);
+          const correctedForce = PhysicsManager.correctForce(force);
+
+          Matter.Body.applyForce(rectangle, applyPosition, correctedForce);
+        });
+      });
+    }
+
+    updateTransformOnVisualNodes() {
+      this.treeManager.visualStartingNodes.forEach((startingNode) => {
+        // TODO: Use consistent iterator function across this file
+        TreeManager.iterateVisualChildren(startingNode, (node) => {
+          const rectangle = this.nodeIDToRectangle[node.getID()];
+          const curPosition = rectangle.position;
+          const origPosition = this.initialPositions[node.getID()];
+          const translation = Matter.Vector.sub(curPosition, origPosition);
+
+          node.setTransform(translation, rectangle.angle);
+        });
+      });
+    }
+
+    buildAllRectangles() {
+      this.staticRectangles = this.buildAllStaticRectangles();
+      console.debug(`Built ${this.staticRectangles.length} static rectangles`);
 
       const dynamicRectResult = this.buildAllDynamicRectangles();
-      const dynamicRectangles = dynamicRectResult.rectangles;
-      const { nodeIDToRectangle } = dynamicRectResult;
-      console.debug(`Built ${dynamicRectangles.length} dynamic rectangles`);
-
-      const outermostConstraints = this.buildAllOutermostConstraints(
-        staticRectangles,
-        nodeIDToRectangle,
-      );
-      console.debug(`Built ${outermostConstraints.length} outermost
- constraints`);
-
-      const innerConstraints = this.buildAllInnerConstraints(nodeIDToRectangle);
-      console.debug(`Built ${innerConstraints.length} inner constraints`);
-
-      const mouseConstraint = this.physicsManager.buildMouseConstraint();
-      console.debug('Built 1 mouse constraint');
-
-      this.physicsManager.addObjects(staticRectangles);
-      this.physicsManager.addObjects(dynamicRectangles);
-      this.physicsManager.addObjects(outermostConstraints);
-      this.physicsManager.addObjects(innerConstraints);
-      this.physicsManager.addObjects(mouseConstraint);
+      this.dynamicRectangles = dynamicRectResult.rectangles;
+      this.nodeIDToRectangle = dynamicRectResult.nodeIDToRectangle;
+      console.debug(`Built ${this.dynamicRectangles.length} dynamic\
+ rectangles`);
     }
 
     buildAllStaticRectangles() {
@@ -611,6 +712,20 @@
         rectangles: allRectangles,
         nodeIDToRectangle: allNodeIDToRectangle,
       };
+    }
+
+    buildAllConstraints() {
+      this.outermostConstraints = this.buildAllOutermostConstraints(
+        this.staticRectangles,
+        this.nodeIDToRectangle,
+      );
+      console.debug(`Built ${this.outermostConstraints.length} outermost\
+ constraints`);
+
+      this.innerConstraints = this.buildAllInnerConstraints(
+        this.nodeIDToRectangle,
+      );
+      console.debug(`Built ${this.innerConstraints.length} inner constraints`);
     }
 
     buildAllOutermostConstraints(staticRectangles, nodeIDToRectangle) {
@@ -648,6 +763,20 @@
         allConstraints = [...allConstraints, ...constraints];
       });
       return allConstraints;
+    }
+
+    saveInitialRectanglePositions() {
+      this.initialPositions = {};
+
+      this.treeManager.visualStartingNodes.forEach((startingNode) => {
+        // TODO: Use consistent iterator function across this file
+        TreeManager.iterateVisualChildren(startingNode, (node) => {
+          const rectangle = this.nodeIDToRectangle[node.getID()];
+          this.initialPositions[node.getID()] = Matter.Vector.clone(
+            rectangle.position,
+          );
+        });
+      });
     }
 
     static buildDynamicRectangles(startingNode) {
@@ -860,8 +989,7 @@
         const boundingBox = otherNode.getBoundingBox();
         const otherCorners = GeometryUtil.getCornerPoints(boundingBox);
         otherCorners.forEach((otherCorner, otherCornerIndex) => {
-          const vector = GeometryUtil.getVector(corner, otherCorner);
-          const vectorAngle = GeometryUtil.angle(vector);
+          const vectorAngle = GeometryUtil.angle(otherCorner, corner);
           if (!(vectorAngle >= minAngle && vectorAngle <= maxAngle)) return;
 
           const dist = GeometryUtil.distance(corner, otherCorner);
@@ -936,6 +1064,8 @@
         this.physicsManager.init(this.treeManager.rootNode);
 
         this.jellifyEngine.init();
+
+        this.jellifyEngine.runAnimation();
       });
     }
 
