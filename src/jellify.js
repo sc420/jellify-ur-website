@@ -44,10 +44,19 @@
       return Matter.Vector.magnitudeSquared(diff);
     }
 
-    static angle(vector1, vector2) {
-      const angle = Matter.Vector.angle(vector1, vector2);
-      const degrees = (angle * 180.0) / Math.PI;
+    static angle(pos1, pos2) {
+      const angleInRadian = Matter.Vector.angle(pos1, pos2);
+      return GeometryUtil.radianToDegree(angleInRadian);
+    }
+
+    static radianToDegree(angleInRadian) {
+      const degrees = (angleInRadian * 180.0) / Math.PI;
       return (360.0 + degrees) % 360.0;
+    }
+
+    static degreeToRadian(angleInDegree) {
+      const radians = (angleInDegree * Math.PI) / 180.0;
+      return (2 * Math.PI + radians) % (2 * Math.PI);
     }
   }
 
@@ -234,7 +243,7 @@
   class TreeManager {
     constructor() {
       this.minMargin = 1;
-      this.minVisualDescendants = 1;
+      this.minVisualDescendants = 0;
       // We limit the number of visual descendants to boost the performance. If
       // a node has too many visual descendants we won't consider it as the
       // starting node
@@ -575,7 +584,7 @@
     }
 
     static getConstraintOptions() {
-      return { stiffness: 0.01 };
+      return { damping: 0.01, stiffness: 0.01 };
     }
   }
 
@@ -584,7 +593,13 @@
       this.treeManager = treeManager;
       this.physicsManager = physicsManager;
 
-      // Objects
+      // Physics constants
+      this.minDeflectForceAngle = -30; // degrees
+      this.maxDeflectForceAngle = 30; // degrees
+      this.minAmplifyForce = 0.9;
+      this.maxAmplifyForce = 1.1;
+
+      // Physics objects
       this.staticRectangles = null;
       this.dynamicRectangles = null;
       this.nodeIDToRectangle = null;
@@ -634,7 +649,7 @@
 
         this.smoothWindowAcceleration.addSample(stepWindowAcceleration);
 
-        this.applyForceToStartingNodeRectangles();
+        this.applyForceToVisualRectangles();
 
         this.updateTransformOnVisualNodes();
       }
@@ -645,9 +660,8 @@
       window.requestAnimationFrame(this.stepAnimation.bind(this));
     }
 
-    applyForceToStartingNodeRectangles() {
+    applyForceToVisualRectangles() {
       const windowAcc = this.smoothWindowAcceleration.getSmoothVector();
-      const negAcc = Matter.Vector.neg(windowAcc);
 
       this.treeManager.visualStartingNodes.forEach((startingNode) => {
         // TODO: Use consistent iterator function across this file
@@ -655,13 +669,30 @@
           const rectangle = this.nodeIDToRectangle[node.getID()];
 
           const applyPosition = rectangle.position;
+          const force = this.calcForceOnVisualRectangle(windowAcc, rectangle);
 
-          const force = Matter.Vector.mult(negAcc, rectangle.mass);
-          const correctedForce = PhysicsManager.correctForce(force);
-
-          Matter.Body.applyForce(rectangle, applyPosition, correctedForce);
+          Matter.Body.applyForce(rectangle, applyPosition, force);
         });
       });
+    }
+
+    calcForceOnVisualRectangle(windowAcc, rectangle) {
+      const negAcc = Matter.Vector.neg(windowAcc);
+      const force = Matter.Vector.mult(negAcc, rectangle.mass);
+      const correctedForce = PhysicsManager.correctForce(force);
+
+      // Randomly deflect the force to make an imperfect appearance
+      const angleRange = this.maxDeflectedAngle - this.minDeflectForceAngle;
+      let randAngle = Math.random() * angleRange + this.maxDeflectForceAngle;
+      randAngle = GeometryUtil.degreeToRadian(randAngle);
+      const deflectedForce = Matter.Vector.rotate(correctedForce, randAngle);
+
+      // Randomly amplify the force to make an imperfect appearance
+      const amplifyRange = this.maxAmplifyForce - this.minAmplifyForce;
+      const randAmplify = Math.random() * amplifyRange + this.minAmplifyForce;
+      const amplifiedForce = Matter.Vector.mult(deflectedForce, randAmplify);
+
+      return amplifiedForce;
     }
 
     updateTransformOnVisualNodes() {
