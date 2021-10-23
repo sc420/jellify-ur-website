@@ -56,8 +56,10 @@
     }
 
     static angle(pos1, pos2) {
-      const angleInRadian = Matter.Vector.angle(pos1, pos2);
-      return GeometryUtil.radianToDegree(angleInRadian);
+      const upwardAngle = Matter.Vector.angle(pos1, pos2);
+      // The result treats Y-axis as upward, but we want downward
+      const downwardAngle = -upwardAngle;
+      return GeometryUtil.radianToDegree(downwardAngle);
     }
 
     static radianToDegree(angleInRadian) {
@@ -374,7 +376,8 @@
       if (curNode.visualParent) return;
 
       if (
-        GeometryUtil.containsRect(
+        this.isBoundingBoxBigEnough(curNode)
+        && GeometryUtil.containsRect(
           visualParentNode.getBoundingBox(),
           curNode.getBoundingBox(),
           this.options.minMargin,
@@ -390,6 +393,14 @@
       curNode.children.forEach((childNode) => {
         this.findVisualChildren(visualParentNode, childNode);
       });
+    }
+
+    isBoundingBoxBigEnough(node) {
+      const boundingBox = node.getBoundingBox();
+      return (
+        boundingBox.width > this.options.minWidth
+        && boundingBox.height > this.options.minHeight
+      );
     }
 
     findVisualRootNodes(node) {
@@ -672,10 +683,11 @@
   }
 
   class JellifyEngine {
-    constructor(treeManager, physicsManager, options) {
+    constructor(treeManager, physicsManager, options, isRender = false) {
       this.treeManager = treeManager;
       this.physicsManager = physicsManager;
       this.options = options;
+      this.isRender = isRender;
 
       // Rendering helpers
       this.windowScrollRenderHelper = new RenderHelper();
@@ -967,7 +979,7 @@
           parentNode.visualChildren,
         );
         results.forEach((result) => {
-          const { nearestNode, nearestCorner, nearestCornerIndex } = result;
+          const { nearestNode, nearestCornerIndex, nearestCorner } = result;
           const nearestRectangle = nodeIDToRectangle[nearestNode.getID()];
           const constraint = PhysicsManager.createConstraint(
             parentNode,
@@ -1005,6 +1017,10 @@
         };
       }
 
+      // Save the Node ID amd its connected corners to avoid connecting the same
+      // two corners twice
+      const connectedCorners = [];
+
       parentNode.visualChildren.forEach((node, nodeIndex) => {
         const rectangle = nodeIDToRectangle[node.getID()];
         const otherNodes = [...parentNode.visualChildren];
@@ -1019,6 +1035,12 @@
             return;
           }
 
+          if (
+            JellifyEngine.isCornerExcluded(node, cornerIndex, connectedCorners)
+          ) {
+            return;
+          }
+
           const angleRange = JellifyEngine.getCornerAngleRange(cornerIndex);
           const results = JellifyEngine.findNearestCorners(
             corner,
@@ -1027,7 +1049,7 @@
             angleRange.maxAngle,
           );
           results.forEach((result) => {
-            const { nearestNode, nearestCorner } = result;
+            const { nearestNode, nearestCornerIndex, nearestCorner } = result;
             const nearestRectangle = nodeIDToRectangle[nearestNode.getID()];
             const constraint = PhysicsManager.createConstraint(
               node,
@@ -1040,12 +1062,19 @@
             );
 
             interConstraints.push(constraint);
+
+            connectedCorners.push({ node, cornerIndex });
+            connectedCorners.push({
+              node: nearestNode,
+              cornerIndex: nearestCornerIndex,
+            });
           });
 
           // Unable to find another corner to connect, we'll deal with it later
           if (results.length === 0) {
             unconnectedCorners.push({
               node,
+              cornerIndex,
               corner,
             });
           }
@@ -1065,10 +1094,17 @@
       const fixedConstraints = [];
       if (parentNode.visualChildren.length === 0) return fixedConstraints;
       unconnectedCorners.forEach((unconnectedCorner) => {
-        const { node, corner } = unconnectedCorner;
+        const { node, cornerIndex, corner } = unconnectedCorner;
+        const angleRange = JellifyEngine.getCornerAngleRange(cornerIndex);
+        const results = JellifyEngine.findNearestCorners(
+          corner,
+          [parentNode],
+          angleRange.minAngle,
+          angleRange.maxAngle,
+        );
+        if (results.length === 0) throw new Error('Expect at least 1 result');
+
         const rectangle = nodeIDToRectangle[node.getID()];
-        const results = JellifyEngine.findNearestCorners(corner, [parentNode]);
-        if (results.length <= 0) throw new Error('Expect at least 1 result');
         results.forEach((result) => {
           const { nearestCorner } = result;
           const constraint = PhysicsManager.createConstraint(
@@ -1099,7 +1135,7 @@
         const boundingBox = otherNode.getBoundingBox();
         const otherCorners = GeometryUtil.getCornerPoints(boundingBox);
         otherCorners.forEach((otherCorner, otherCornerIndex) => {
-          const vectorAngle = GeometryUtil.angle(otherCorner, corner);
+          const vectorAngle = GeometryUtil.angle(corner, otherCorner);
           if (!(vectorAngle >= minAngle && vectorAngle <= maxAngle)) return;
 
           const dist = GeometryUtil.distance(corner, otherCorner);
@@ -1110,8 +1146,8 @@
             }
             results.push({
               nearestNode: otherNode,
-              nearestCorner: otherCorner,
               nearestCornerIndex: otherCornerIndex,
+              nearestCorner: otherCorner,
             });
           }
         });
@@ -1188,6 +1224,10 @@
       this.globalDebugName = 'JELLIFY_DEBUG';
       this.defaultOptions = {
         tree: {
+          // We limit the minimal size to avoid building a very small rectangle
+          // that acts as a pivot in physics simulation
+          minWidth: 5,
+          minHeight: 5,
           // How much margin between the parent and children visual nodes. Set
           // a non-zero value to avoid exactly overlapping bounding box of the
           // parent and child nodes
@@ -1257,12 +1297,15 @@
       $(document).ready(() => {
         this.options = this.readOptions();
 
+        const isRender = this.isDebugMode();
+
         this.treeManager = new TreeManager(this.options.tree);
-        this.physicsManager = new PhysicsManager(this.isDebugMode());
+        this.physicsManager = new PhysicsManager(isRender);
         this.jellifyEngine = new JellifyEngine(
           this.treeManager,
           this.physicsManager,
           this.options,
+          isRender,
         );
 
         this.setLoaded();
