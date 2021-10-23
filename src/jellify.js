@@ -1213,9 +1213,9 @@
   class App {
     constructor() {
       // App constants
-      this.globalBookmarkletName = 'JELLIFY_BOOKMARKLET';
-      this.globalOptionsName = 'JELLIFY_OPTIONS';
-      this.globalDebugName = 'JELLIFY_DEBUG';
+      this.globalBookmarkletName = 'WOBBLY_BOOKMARKLET';
+      this.globalOptionsName = 'WOBBLY_OPTIONS';
+      this.globalDebugName = 'WOBBLY_DEBUG';
       this.defaultOptions = {
         tree: {
           // How much margin between the parent and children visual nodes. Set
@@ -1282,7 +1282,7 @@
 
     init() {
       if (this.isLoaded()) {
-        console.info('Jellify is already loaded, not doing anything new');
+        console.info('Wobbly is already loaded, not doing anything new');
         return;
       }
 
