@@ -25,17 +25,22 @@
       ];
     }
 
-    static boundingBoxToCenterBox(boundingBox) {
+    static boundingBoxToCenterBox(rect) {
       return {
-        x: boundingBox.x + boundingBox.width / 2.0,
-        y: boundingBox.y + boundingBox.height / 2.0,
-        width: boundingBox.width,
-        height: boundingBox.height,
+        x: rect.x + rect.width / 2.0,
+        y: rect.y + rect.height / 2.0,
+        width: rect.width,
+        height: rect.height,
       };
     }
 
-    static absToRelPos(absPos, boundingBox) {
-      const centerBox = GeometryUtil.boundingBoxToCenterBox(boundingBox);
+    static diagonalLength(rect) {
+      const diagonalVector = Matter.Vector.create(rect.width, rect.height);
+      return Matter.Vector.magnitude(diagonalVector);
+    }
+
+    static absToRelPos(absPos, rect) {
+      const centerBox = GeometryUtil.boundingBoxToCenterBox(rect);
       return Matter.Vector.sub(absPos, centerBox);
     }
 
@@ -482,6 +487,7 @@
 
     init(rootNode) {
       this.engine = Matter.Engine.create({
+        // Disable the gravity
         gravity: {
           y: 0,
         },
@@ -546,6 +552,7 @@
       staticRect,
       startingRect,
       corner,
+      options,
     ) {
       return PhysicsManager.createConstraint(
         startingNode,
@@ -554,21 +561,36 @@
         startingRect,
         corner,
         corner,
+        options,
       );
     }
 
-    static createConstraint(nodeA, nodeB, bodyA, bodyB, cornerA, cornerB) {
+    static createConstraint(
+      nodeA,
+      nodeB,
+      bodyA,
+      bodyB,
+      cornerA,
+      cornerB,
+      options,
+    ) {
       const boundingBoxA = nodeA.getBoundingBox();
       const boundingBoxB = nodeB.getBoundingBox();
       const pointA = GeometryUtil.absToRelPos(cornerA, boundingBoxA);
       const pointB = GeometryUtil.absToRelPos(cornerB, boundingBoxB);
-      const options = PhysicsManager.getConstraintOptions();
+      const constraintOptions = PhysicsManager.getConstraintOptions(
+        boundingBoxA,
+        boundingBoxB,
+        pointA,
+        pointB,
+        options,
+      );
       return Matter.Constraint.create({
         bodyA,
         pointA,
         bodyB,
         pointB,
-        ...options,
+        ...constraintOptions,
       });
     }
 
@@ -583,8 +605,33 @@
       };
     }
 
-    static getConstraintOptions() {
-      return { damping: 0.01, stiffness: 0.01 };
+    static getConstraintOptions(
+      boundingBoxA,
+      boundingBoxB,
+      pointA,
+      pointB,
+      options,
+    ) {
+      const diagonalLengthA = GeometryUtil.diagonalLength(boundingBoxA);
+      const diagonalLengthB = GeometryUtil.diagonalLength(boundingBoxB);
+      const maxDiagonalLength = Math.max(diagonalLengthA, diagonalLengthB);
+
+      const vecAtoB = Matter.Vector.sub(pointA, pointB);
+      const distance = Matter.Vector.magnitude(vecAtoB);
+      const distanceRatio = distance / maxDiagonalLength;
+      const stiffness = this.calcStiffness(
+        distanceRatio,
+        options.minStiffness,
+        options.maxStiffness,
+      );
+
+      return { damping: 0.01, stiffness };
+    }
+
+    static calcStiffness(ratio, minStiffness, maxStiffness) {
+      const stiffnessRange = maxStiffness - minStiffness;
+      const poweredRatio = ratio ** 2;
+      return poweredRatio * stiffnessRange + minStiffness;
     }
   }
 
@@ -636,6 +683,10 @@
       this.physicsRenderHelper = new RenderHelper(60 /* maxFPS */);
 
       // Physics constants
+      this.constraintOptions = {
+        minStiffness: 0.03,
+        maxStiffness: 1.0,
+      };
       this.minDeflectForceAngle = -30; // degrees
       this.maxDeflectForceAngle = 30; // degrees
       this.minAmplifyForce = 0.9;
@@ -660,7 +711,7 @@
     init() {
       this.buildAllRectangles();
 
-      this.buildAllConstraints();
+      this.buildAllConstraints(this.constraintOptions);
 
       this.mouseConstraint = this.physicsManager.buildMouseConstraint();
 
@@ -697,7 +748,7 @@
 
       // Update physics
       this.physicsRenderHelper.step((elapsedTime, prevElapsedTime) => {
-        this.applyForceToVisualRectangles();
+        this.applyForceToStartingRectangles();
 
         this.updateTransformOnVisualNodes();
 
@@ -709,19 +760,16 @@
       window.requestAnimationFrame(this.stepAnimation.bind(this));
     }
 
-    applyForceToVisualRectangles() {
+    applyForceToStartingRectangles() {
       const windowAcc = this.smoothWindowAcceleration.getSmoothVector();
 
       this.treeManager.visualStartingNodes.forEach((startingNode) => {
-        // TODO: Use consistent iterator function across this file
-        TreeManager.iterateVisualChildren(startingNode, (node) => {
-          const rectangle = this.nodeIDToRectangle[node.getID()];
+        const rectangle = this.nodeIDToRectangle[startingNode.getID()];
 
-          const applyPosition = rectangle.position;
-          const force = this.calcForceOnVisualRectangle(windowAcc, rectangle);
+        const applyPosition = rectangle.position;
+        const force = this.calcForceOnVisualRectangle(windowAcc, rectangle);
 
-          Matter.Body.applyForce(rectangle, applyPosition, force);
-        });
+        Matter.Body.applyForce(rectangle, applyPosition, force);
       });
     }
 
@@ -794,21 +842,23 @@
       };
     }
 
-    buildAllConstraints() {
+    buildAllConstraints(options) {
       this.outermostConstraints = this.buildAllOutermostConstraints(
         this.staticRectangles,
         this.nodeIDToRectangle,
+        options,
       );
       console.debug(`Built ${this.outermostConstraints.length} outermost\
  constraints`);
 
       this.innerConstraints = this.buildAllInnerConstraints(
         this.nodeIDToRectangle,
+        options,
       );
       console.debug(`Built ${this.innerConstraints.length} inner constraints`);
     }
 
-    buildAllOutermostConstraints(staticRectangles, nodeIDToRectangle) {
+    buildAllOutermostConstraints(staticRectangles, nodeIDToRectangle, options) {
       const allConstraints = [];
       this.treeManager.visualStartingNodes.forEach((startingNode, index) => {
         const staticRectangle = staticRectangles[index];
@@ -825,6 +875,7 @@
             staticRectangle,
             startingRectangle,
             corner,
+            options,
           );
           allConstraints.push(constraint);
         });
@@ -832,12 +883,13 @@
       return allConstraints;
     }
 
-    buildAllInnerConstraints(nodeIDToRectangle) {
+    buildAllInnerConstraints(nodeIDToRectangle, options) {
       let allConstraints = [];
       this.treeManager.visualStartingNodes.forEach((startingNode) => {
         const constraints = JellifyEngine.buildInnerConstraints(
           startingNode,
           nodeIDToRectangle,
+          options,
         );
 
         allConstraints = [...allConstraints, ...constraints];
@@ -882,7 +934,7 @@
       return staticRectangle;
     }
 
-    static buildInnerConstraints(startingNode, nodeIDToRectangle) {
+    static buildInnerConstraints(startingNode, nodeIDToRectangle, options) {
       const visitor = new TreeVisitor(startingNode);
       const iterator = visitor.getVisualChildrenIterator();
       let curItem = iterator.next();
@@ -895,6 +947,7 @@
         result = JellifyEngine.buildDiagonalConstraints(
           curNode,
           nodeIDToRectangle,
+          options,
         );
         const { diagonalConstraints, excludedCorners } = result;
 
@@ -903,6 +956,7 @@
           curNode,
           excludedCorners,
           nodeIDToRectangle,
+          options,
         );
         const { interConstraints, unconnectedCorners } = result;
 
@@ -912,6 +966,7 @@
           curNode,
           unconnectedCorners,
           nodeIDToRectangle,
+          options,
         );
 
         constraints = [
@@ -926,7 +981,7 @@
       return constraints;
     }
 
-    static buildDiagonalConstraints(parentNode, nodeIDToRectangle) {
+    static buildDiagonalConstraints(parentNode, nodeIDToRectangle, options) {
       const parentRectangle = nodeIDToRectangle[parentNode.getID()];
       const parentBoundingBox = parentNode.getBoundingBox();
       const corners = GeometryUtil.getCornerPoints(parentBoundingBox);
@@ -951,6 +1006,7 @@
             nearestRectangle,
             corner,
             nearestCorner,
+            options,
           );
 
           diagonalConstraints.push(constraint);
@@ -968,6 +1024,7 @@
       parentNode,
       excludedCorners,
       nodeIDToRectangle,
+      options,
     ) {
       const interConstraints = [];
       const unconnectedCorners = [];
@@ -1009,6 +1066,7 @@
               nearestRectangle,
               corner,
               nearestCorner,
+              options,
             );
 
             interConstraints.push(constraint);
@@ -1030,6 +1088,7 @@
       parentNode,
       unconnectedCorners,
       nodeIDToRectangle,
+      options,
     ) {
       const parentRectangle = nodeIDToRectangle[parentNode.getID()];
 
@@ -1049,6 +1108,7 @@
             rectangle,
             nearestCorner,
             corner,
+            options,
           );
 
           fixedConstraints.push(constraint);
