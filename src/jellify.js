@@ -96,6 +96,7 @@
 
     getSmoothVector() {
       const initVector = Matter.Vector.create(0, 0);
+      if (this.samples.length === 0) return initVector;
       const accumulatedVector = this.samples.reduce((prevVector, curSample) => {
         return Matter.Vector.add(prevVector, curSample);
       }, initVector);
@@ -500,7 +501,6 @@
 
       this.mouse = Matter.Mouse.create(this.render.canvas);
 
-      Matter.Runner.run(this.runner, this.engine);
       Matter.Render.run(this.render);
     }
 
@@ -588,10 +588,52 @@
     }
   }
 
+  class RenderHelper {
+    constructor(maxFPS) {
+      this.maxFPS = maxFPS; // frames/second
+
+      this.minInterval = 1.0 / this.maxFPS;
+      this.elapsedTime = 0; // seconds
+      this.prevTimestamp = null; // seconds
+      this.prevElapsedTime = null; // seconds
+    }
+
+    step(fnRender) {
+      // Reference: https://github.com/liabru/matter-js/issues/818
+      const curTimestamp = Date.now() / 1000.0;
+      if (this.prevTimestamp === null) {
+        // First step
+        this.prevTimestamp = curTimestamp;
+        return;
+      }
+
+      this.elapsedTime = curTimestamp - this.prevTimestamp;
+
+      if (this.canRender()) {
+        if (this.prevElapsedTime !== null) {
+          fnRender(this.elapsedTime, this.prevElapsedTime);
+        }
+
+        this.prevElapsedTime = this.elapsedTime;
+
+        this.elapsedTime = 0;
+        this.prevTimestamp = curTimestamp;
+      }
+    }
+
+    canRender() {
+      return this.elapsedTime >= this.minInterval;
+    }
+  }
+
   class JellifyEngine {
     constructor(treeManager, physicsManager) {
       this.treeManager = treeManager;
       this.physicsManager = physicsManager;
+
+      // Rendering helpers
+      this.windowScrollRenderHelper = new RenderHelper(Infinity);
+      this.physicsRenderHelper = new RenderHelper(60 /* maxFPS */);
 
       // Physics constants
       this.minDeflectForceAngle = -30; // degrees
@@ -607,11 +649,10 @@
       this.innerConstraints = null;
       this.mouseConstraint = null;
 
-      // Positions
+      // Physics positions
       this.initialPositions = null;
 
-      // Animation
-      this.prevTimestamp = null;
+      // Window scroll acceleration
       this.prevScroll = null;
       this.smoothWindowAcceleration = new SmoothVector(3);
     }
@@ -636,26 +677,34 @@
       window.requestAnimationFrame(this.stepAnimation.bind(this));
     }
 
-    stepAnimation(timestamp) {
+    stepAnimation() {
       const curScroll = Matter.Vector.create(window.scrollX, window.scrollY);
 
-      if (this.prevTimestamp !== null) {
-        const elapsedSec = (timestamp - this.prevTimestamp) / 1000.0;
-        const scrollDiff = Matter.Vector.sub(curScroll, this.prevScroll);
-        const stepWindowAcceleration = Matter.Vector.div(
-          scrollDiff,
-          elapsedSec,
-        );
+      // Add window scroll sample to calculate window scroll acceleration
+      this.windowScrollRenderHelper.step((elapsedTime) => {
+        if (this.prevScroll != null) {
+          const scrollDiff = Matter.Vector.sub(curScroll, this.prevScroll);
+          const stepWindowAcceleration = Matter.Vector.div(
+            scrollDiff,
+            elapsedTime,
+          );
 
-        this.smoothWindowAcceleration.addSample(stepWindowAcceleration);
+          this.smoothWindowAcceleration.addSample(stepWindowAcceleration);
+        }
 
+        this.prevScroll = curScroll;
+      });
+
+      // Update physics
+      this.physicsRenderHelper.step((elapsedTime, prevElapsedTime) => {
         this.applyForceToVisualRectangles();
 
         this.updateTransformOnVisualNodes();
-      }
 
-      this.prevTimestamp = timestamp;
-      this.prevScroll = curScroll;
+        const delta = 1000 * elapsedTime;
+        const correction = elapsedTime / prevElapsedTime;
+        Matter.Engine.update(this.physicsManager.engine, delta, correction);
+      });
 
       window.requestAnimationFrame(this.stepAnimation.bind(this));
     }
