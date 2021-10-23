@@ -4,6 +4,12 @@
 /* eslint no-console: ["error", { allow: ["info", "debug"] }] */
 
 (() => {
+  class RandomUtil {
+    static randValue(min, max) {
+      return Math.random() * (max - min) + min;
+    }
+  }
+
   class GeometryUtil {
     static containsRect(rect1, rect2, margin = 0) {
       return (
@@ -765,7 +771,11 @@
       this.treeManager.visualStartingNodes.forEach((startingNode) => {
         const rectangle = this.nodeIDToRectangle[startingNode.getID()];
 
-        const applyPosition = rectangle.position;
+        const applyPosition = JellifyEngine.calcApplyForcePosition(
+          startingNode,
+          rectangle,
+          this.options.physics.force,
+        );
         const force = JellifyEngine.calcForceOnVisualRectangle(
           windowAcc,
           rectangle,
@@ -1157,20 +1167,43 @@
       };
     }
 
+    static calcApplyForcePosition(node, rectangle, options) {
+      const randShiftRatioX = RandomUtil.randValue(
+        options.minRandomShift,
+        options.maxRandomShift,
+      );
+      const randShiftRatioY = RandomUtil.randValue(
+        options.minRandomShift,
+        options.maxRandomShift,
+      );
+      const boundingBox = node.getBoundingBox();
+      const offset = Matter.Vector.create(
+        boundingBox.width * randShiftRatioX,
+        boundingBox.height * randShiftRatioY,
+      );
+      const center = rectangle.position;
+      const offsetPosition = Matter.Vector.add(center, offset);
+      return offsetPosition;
+    }
+
     static calcForceOnVisualRectangle(windowAcc, rectangle, options) {
       const negAcc = Matter.Vector.neg(windowAcc);
       const force = Matter.Vector.mult(negAcc, rectangle.mass);
       const correctedForce = PhysicsManager.correctForce(force);
 
-      // Randomly rotate the force to make an imperfect appearance
-      const angleRange = options.maxRandomRotate - options.minRandomRotate;
-      let randAngle = Math.random() * angleRange + options.minRandomRotate;
-      randAngle = GeometryUtil.degreeToRadian(randAngle);
+      // Randomly rotate the force
+      const randAngleInDegree = RandomUtil.randValue(
+        options.minRandomRotate,
+        options.maxRandomRotate,
+      );
+      const randAngle = GeometryUtil.degreeToRadian(randAngleInDegree);
       const rotatedForce = Matter.Vector.rotate(correctedForce, randAngle);
 
-      // Randomly scale the force to make an imperfect appearance
-      const scaleRange = options.maxRandomScale - options.minRandomScale;
-      const randScale = Math.random() * scaleRange + options.minRandomScale;
+      // Randomly scale the force
+      const randScale = RandomUtil.randValue(
+        options.minRandomScale,
+        options.maxRandomScale,
+      );
       const scaledForce = Matter.Vector.mult(rotatedForce, randScale);
 
       return scaledForce;
@@ -1188,15 +1221,15 @@
           // How much margin between the parent and children visual nodes. Set
           // a non-zero value to avoid exactly overlapping bounding box of the
           // parent and child nodes
-          minMargin: 1,
+          minMargin: 5, // pixels
           // We limit the number of visual descendants to boost the performance.
           // If a node has too many visual descendants we won't consider it as
           // the starting node
           minVisualDescendants: 0,
-          maxVisualDescendants: 30,
+          maxVisualDescendants: 10,
           // We limit the height in the visual tree to avoid long stacked
           // rectangles
-          maxVisualHeight: 10,
+          maxVisualHeight: 5,
         },
         render: {
           minFPS: 10,
@@ -1222,8 +1255,14 @@
             smoothness: 3,
           },
           force: {
-            minRandomRotate: -30,
-            maxRandomRotate: 30,
+            // Apply the force to an offset position from the center (0-1).
+            // 0 means no offset, 1 means shift to the edge
+            minRandomShift: -0.01, // ratio
+            maxRandomShift: 0.01, // ratio
+            // Randomly rotate the force to make it chaotic
+            minRandomRotate: -30, // degrees
+            maxRandomRotate: 30, // degrees
+            // Randomly scale the force to make it chaotic
             minRandomScale: 0.9,
             maxRandomScale: 1.1,
           },
