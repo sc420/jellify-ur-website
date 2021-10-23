@@ -233,8 +233,7 @@
       let queue = [this.rootNode];
       while (queue.length > 0) {
         const node = queue.shift();
-        // DFS
-        queue = [...queue, ...node.children];
+        queue = [...queue, ...node.children]; // DFS
 
         yield node;
       }
@@ -244,10 +243,35 @@
       let queue = [this.rootNode];
       while (queue.length > 0) {
         const node = queue.shift();
-        // DFS
-        queue = [...queue, ...node.visualChildren];
+        queue = [...queue, ...node.visualChildren]; // DFS
 
         yield node;
+      }
+    }
+  }
+
+  class TreeIterator {
+    static iterateChildren(rootNode, fnCallback) {
+      const visitor = new TreeVisitor(rootNode);
+      const iterator = visitor.getChildrenIterator();
+      let curItem = iterator.next();
+      while (!curItem.done) {
+        const curNode = curItem.value;
+        fnCallback(curNode);
+
+        curItem = iterator.next();
+      }
+    }
+
+    static iterateVisualChildren(rootNode, fnCallback) {
+      const visitor = new TreeVisitor(rootNode);
+      const iterator = visitor.getVisualChildrenIterator();
+      let curItem = iterator.next();
+      while (!curItem.done) {
+        const curNode = curItem.value;
+        fnCallback(curNode);
+
+        curItem = iterator.next();
       }
     }
   }
@@ -276,30 +300,30 @@
       console.debug(`Created ${this.treeNodeCount} tree nodes`);
       console.debug(`${this.visibleTreeNodeCount} of tree nodes are visible`);
 
-      TreeManager.iterateChildren(
+      TreeIterator.iterateChildren(
         this.rootNode,
         this.buildVisualChildren.bind(this),
       );
       console.debug(`Built ${this.visualTreeEdgeCount} visual tree edges`);
 
-      TreeManager.iterateChildren(
+      TreeIterator.iterateChildren(
         this.rootNode,
         this.findVisualRootNodes.bind(this),
       );
       console.debug(`Found ${this.visualRootNodes.length} visual root nodes`);
 
       this.visualRootNodes.forEach((visualRootNode) => {
-        TreeManager.iterateVisualChildren(
+        TreeIterator.iterateVisualChildren(
           visualRootNode,
           this.countVisualDescendants.bind(this),
         );
 
-        TreeManager.iterateVisualChildren(
+        TreeIterator.iterateVisualChildren(
           visualRootNode,
           this.calcVisualHeight.bind(this),
         );
 
-        TreeManager.iterateVisualChildren(
+        TreeIterator.iterateVisualChildren(
           visualRootNode,
           this.findVisualStartingNodes.bind(this),
         );
@@ -422,7 +446,7 @@
 
       // Prevent all children nodes to be visited later on
       node.visualChildren.forEach((childNode) => {
-        TreeManager.iterateVisualChildren(childNode, (curNode) => {
+        TreeIterator.iterateVisualChildren(childNode, (curNode) => {
           curNode.disallowStartingNode();
         });
       });
@@ -430,49 +454,18 @@
 
     render() {
       this.visualStartingNodes.forEach((visualStartingNode) => {
-        TreeManager.renderVisualChildren(visualStartingNode);
+        TreeIterator.renderVisualChildren(visualStartingNode);
       });
     }
 
-    static iterateChildren(rootNode, fnCallback) {
-      const visitor = new TreeVisitor(rootNode);
-      const iterator = visitor.getChildrenIterator();
-      let curItem = iterator.next();
-      while (!curItem.done) {
-        const curNode = curItem.value;
-        fnCallback(curNode);
-
-        curItem = iterator.next();
-      }
-    }
-
-    static iterateVisualChildren(rootNode, fnCallback) {
-      const visitor = new TreeVisitor(rootNode);
-      const iterator = visitor.getVisualChildrenIterator();
-      let curItem = iterator.next();
-      while (!curItem.done) {
-        const curNode = curItem.value;
-        fnCallback(curNode);
-
-        curItem = iterator.next();
-      }
-    }
-
     static renderVisualChildren(startingNode) {
-      const visitor = new TreeVisitor(startingNode);
-      const iterator = visitor.getVisualChildrenIterator();
-      let curItem = iterator.next();
-      while (!curItem.done) {
-        const curNode = curItem.value;
-
+      TreeIterator.iterateVisualChildren(startingNode, (curNode) => {
         if (curNode.getID() === startingNode.getID()) {
           curNode.render('solid', 'red');
         } else {
           curNode.render('dotted', 'blue');
         }
-
-        curItem = iterator.next();
-      }
+      });
     }
   }
 
@@ -788,8 +781,7 @@
 
     updateTransformOnVisualNodes() {
       this.treeManager.visualStartingNodes.forEach((startingNode) => {
-        // TODO: Use consistent iterator function across this file
-        TreeManager.iterateVisualChildren(startingNode, (node) => {
+        TreeIterator.iterateVisualChildren(startingNode, (node) => {
           const rectangle = this.nodeIDToRectangle[node.getID()];
           const curPosition = rectangle.position;
           const origPosition = this.initialPositions[node.getID()];
@@ -898,8 +890,7 @@
       this.initialPositions = {};
 
       this.treeManager.visualStartingNodes.forEach((startingNode) => {
-        // TODO: Use consistent iterator function across this file
-        TreeManager.iterateVisualChildren(startingNode, (node) => {
+        TreeIterator.iterateVisualChildren(startingNode, (node) => {
           const rectangle = this.nodeIDToRectangle[node.getID()];
           this.initialPositions[node.getID()] = Matter.Vector.clone(
             rectangle.position,
@@ -918,30 +909,19 @@
     }
 
     static buildDynamicRectangles(startingNode, options) {
-      const visitor = new TreeVisitor(startingNode);
-      const iterator = visitor.getVisualChildrenIterator();
-      let curItem = iterator.next();
       const rectangles = [];
       const nodeIDToRectangle = {};
-      while (!curItem.done) {
-        const curNode = curItem.value;
+      TreeIterator.iterateVisualChildren(startingNode, (curNode) => {
         const rectangle = PhysicsManager.createRectangle(curNode, options);
         rectangles.push(rectangle);
         nodeIDToRectangle[curNode.getID()] = rectangle;
-
-        curItem = iterator.next();
-      }
+      });
       return { rectangles, nodeIDToRectangle };
     }
 
     static buildInnerConstraints(startingNode, nodeIDToRectangle, options) {
-      const visitor = new TreeVisitor(startingNode);
-      const iterator = visitor.getVisualChildrenIterator();
-      let curItem = iterator.next();
       let constraints = [];
-      while (!curItem.done) {
-        const curNode = curItem.value;
-
+      TreeIterator.iterateVisualChildren(startingNode, (curNode) => {
         let result = {};
         // Build diagonal constraints
         result = JellifyEngine.buildDiagonalConstraints(
@@ -975,9 +955,7 @@
           ...interConstraints,
           ...fixedConstraints,
         ];
-
-        curItem = iterator.next();
-      }
+      });
       return constraints;
     }
 
