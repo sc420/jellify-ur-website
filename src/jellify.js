@@ -454,7 +454,7 @@
 
     render() {
       this.visualStartingNodes.forEach((visualStartingNode) => {
-        TreeIterator.renderVisualChildren(visualStartingNode);
+        TreeManager.renderVisualChildren(visualStartingNode);
       });
     }
 
@@ -1236,15 +1236,10 @@
         },
       };
 
-      this.options = this.readOptions();
-
-      this.treeManager = new TreeManager(this.options.tree);
-      this.physicsManager = new PhysicsManager(this.isDebugMode());
-      this.jellifyEngine = new JellifyEngine(
-        this.treeManager,
-        this.physicsManager,
-        this.options,
-      );
+      this.options = null;
+      this.treeManager = null;
+      this.physicsManager = null;
+      this.jellifyEngine = null;
     }
 
     init() {
@@ -1260,6 +1255,16 @@
 
     waitPageToBeReady() {
       $(document).ready(() => {
+        this.options = this.readOptions();
+
+        this.treeManager = new TreeManager(this.options.tree);
+        this.physicsManager = new PhysicsManager(this.isDebugMode());
+        this.jellifyEngine = new JellifyEngine(
+          this.treeManager,
+          this.physicsManager,
+          this.options,
+        );
+
         this.setLoaded();
 
         this.treeManager.init();
@@ -1280,7 +1285,8 @@
       if (typeof window[this.globalOptionsName] === 'undefined') {
         return this.defaultOptions;
       }
-      return window[this.globalOptionsName];
+      const overrideOptions = window[this.globalOptionsName];
+      return Matter.Common.extend(this.defaultOptions, overrideOptions);
     }
 
     isLoaded() {
