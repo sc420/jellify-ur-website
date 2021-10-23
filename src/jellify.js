@@ -682,8 +682,8 @@
       const correctedForce = PhysicsManager.correctForce(force);
 
       // Randomly deflect the force to make an imperfect appearance
-      const angleRange = this.maxDeflectedAngle - this.minDeflectForceAngle;
-      let randAngle = Math.random() * angleRange + this.maxDeflectForceAngle;
+      const angleRange = this.maxDeflectForceAngle - this.minDeflectForceAngle;
+      let randAngle = Math.random() * angleRange + this.minDeflectForceAngle;
       randAngle = GeometryUtil.degreeToRadian(randAngle);
       const deflectedForce = Matter.Vector.rotate(correctedForce, randAngle);
 
