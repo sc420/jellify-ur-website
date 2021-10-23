@@ -247,15 +247,8 @@
   }
 
   class TreeManager {
-    constructor() {
-      this.minMargin = 1;
-      this.minVisualDescendants = 0;
-      // We limit the number of visual descendants to boost the performance. If
-      // a node has too many visual descendants we won't consider it as the
-      // starting node
-      this.maxVisualDescendants = 10;
-      // We limit the height in the visual tree to avoid long stacked rectangles
-      this.maxVisualHeight = 5;
+    constructor(options) {
+      this.options = options;
 
       // The root node is built from "body" tag
       this.rootNode = null;
@@ -354,7 +347,7 @@
         GeometryUtil.containsRect(
           visualParentNode.getBoundingBox(),
           curNode.getBoundingBox(),
-          this.minMargin,
+          this.options.minMargin,
         )
       ) {
         visualParentNode.addVisualChild(curNode);
@@ -411,9 +404,9 @@
     findVisualStartingNodes(node) {
       if (
         !node.canBeStartingNode
-        || node.numVisualDescendants < this.minVisualDescendants
-        || node.numVisualDescendants > this.maxVisualDescendants
-        || node.visualHeight > this.maxVisualHeight
+        || node.numVisualDescendants < this.options.minVisualDescendants
+        || node.numVisualDescendants > this.options.maxVisualDescendants
+        || node.visualHeight > this.options.maxVisualHeight
       ) {
         return;
       }
@@ -532,8 +525,8 @@
       return Matter.Vector.div(force, 1000000);
     }
 
-    static createRectangle(node) {
-      const options = PhysicsManager.getRectangleOptions(node);
+    static createRectangle(node, options) {
+      const rectangleOptions = PhysicsManager.getRectangleOptions(node);
       const boundingBox = node.getBoundingBox();
       const centerBox = GeometryUtil.boundingBoxToCenterBox(boundingBox);
       const rectangle = Matter.Bodies.rectangle(
@@ -541,10 +534,10 @@
         centerBox.y,
         centerBox.width,
         centerBox.height,
-        options,
+        rectangleOptions,
       );
 
-      Matter.Body.setMass(rectangle, 1.0);
+      Matter.Body.setMass(rectangle, options.mass);
       return rectangle;
     }
 
@@ -624,10 +617,10 @@
         distanceRatio,
         options.minStiffness,
         options.maxStiffness,
-        options.softness,
+        options.stiffnessCurveSoftness,
       );
 
-      return { damping: 0.01, stiffness };
+      return { damping: options.damping, stiffness };
     }
 
     static calcStiffness(ratio, minStiffness, maxStiffness, softness) {
@@ -682,27 +675,17 @@
   }
 
   class JellifyEngine {
-    constructor(treeManager, physicsManager) {
+    constructor(treeManager, physicsManager, options) {
       this.treeManager = treeManager;
       this.physicsManager = physicsManager;
+      this.options = options;
 
       // Rendering helpers
       this.windowScrollRenderHelper = new RenderHelper();
       this.physicsRenderHelper = new RenderHelper(
-        10 /* minFPS */,
-        120, /* maxFPS */
+        this.options.render.minFPS /* minFPS */,
+        this.options.render.maxFPS, /* maxFPS */
       );
-
-      // Physics constants
-      this.constraintOptions = {
-        minStiffness: 0.01,
-        maxStiffness: 1.0,
-        softness: 2,
-      };
-      this.minDeflectForceAngle = -30; // degrees
-      this.maxDeflectForceAngle = 30; // degrees
-      this.minAmplifyForce = 0.9;
-      this.maxAmplifyForce = 1.1;
 
       // Physics objects
       this.staticRectangles = null;
@@ -717,13 +700,15 @@
 
       // Window scroll acceleration
       this.prevScroll = null;
-      this.smoothWindowAcceleration = new SmoothVector(3);
+      this.smoothWindowAcceleration = new SmoothVector(
+        this.options.physics.acceleration.smoothness,
+      );
     }
 
     init() {
-      this.buildAllRectangles();
+      this.buildAllRectangles(this.options.physics.rectangle);
 
-      this.buildAllConstraints(this.constraintOptions);
+      this.buildAllConstraints(this.options.physics.constraint);
 
       this.saveInitialRectanglePositions();
 
@@ -781,29 +766,14 @@
         const rectangle = this.nodeIDToRectangle[startingNode.getID()];
 
         const applyPosition = rectangle.position;
-        const force = this.calcForceOnVisualRectangle(windowAcc, rectangle);
+        const force = JellifyEngine.calcForceOnVisualRectangle(
+          windowAcc,
+          rectangle,
+          this.options.physics.force,
+        );
 
         Matter.Body.applyForce(rectangle, applyPosition, force);
       });
-    }
-
-    calcForceOnVisualRectangle(windowAcc, rectangle) {
-      const negAcc = Matter.Vector.neg(windowAcc);
-      const force = Matter.Vector.mult(negAcc, rectangle.mass);
-      const correctedForce = PhysicsManager.correctForce(force);
-
-      // Randomly deflect the force to make an imperfect appearance
-      const angleRange = this.maxDeflectForceAngle - this.minDeflectForceAngle;
-      let randAngle = Math.random() * angleRange + this.minDeflectForceAngle;
-      randAngle = GeometryUtil.degreeToRadian(randAngle);
-      const deflectedForce = Matter.Vector.rotate(correctedForce, randAngle);
-
-      // Randomly amplify the force to make an imperfect appearance
-      const amplifyRange = this.maxAmplifyForce - this.minAmplifyForce;
-      const randAmplify = Math.random() * amplifyRange + this.minAmplifyForce;
-      const amplifiedForce = Matter.Vector.mult(deflectedForce, randAmplify);
-
-      return amplifiedForce;
     }
 
     updateTransformOnVisualNodes() {
@@ -820,28 +790,31 @@
       });
     }
 
-    buildAllRectangles() {
-      this.staticRectangles = this.buildAllStaticRectangles();
+    buildAllRectangles(options) {
+      this.staticRectangles = this.buildAllStaticRectangles(options);
       console.debug(`Built ${this.staticRectangles.length} static rectangles`);
 
-      const dynamicRectResult = this.buildAllDynamicRectangles();
+      const dynamicRectResult = this.buildAllDynamicRectangles(options);
       this.dynamicRectangles = dynamicRectResult.rectangles;
       this.nodeIDToRectangle = dynamicRectResult.nodeIDToRectangle;
       console.debug(`Built ${this.dynamicRectangles.length} dynamic\
  rectangles`);
     }
 
-    buildAllStaticRectangles() {
+    buildAllStaticRectangles(options) {
       return this.treeManager.visualStartingNodes.map((startingNode) => {
-        return JellifyEngine.buildStaticRectangle(startingNode);
+        return JellifyEngine.buildStaticRectangle(startingNode, options);
       });
     }
 
-    buildAllDynamicRectangles() {
+    buildAllDynamicRectangles(options) {
       let allRectangles = [];
       let allNodeIDToRectangle = {};
       this.treeManager.visualStartingNodes.forEach((startingNode) => {
-        const result = JellifyEngine.buildDynamicRectangles(startingNode);
+        const result = JellifyEngine.buildDynamicRectangles(
+          startingNode,
+          options,
+        );
         const { rectangles, nodeIDToRectangle } = result;
 
         allRectangles = [...allRectangles, ...rectangles];
@@ -925,7 +898,16 @@
       });
     }
 
-    static buildDynamicRectangles(startingNode) {
+    static buildStaticRectangle(startingNode, options) {
+      const staticRectangle = PhysicsManager.createRectangle(
+        startingNode,
+        options,
+      );
+      Matter.Body.setStatic(staticRectangle, true);
+      return staticRectangle;
+    }
+
+    static buildDynamicRectangles(startingNode, options) {
       const visitor = new TreeVisitor(startingNode);
       const iterator = visitor.getVisualChildrenIterator();
       let curItem = iterator.next();
@@ -933,19 +915,13 @@
       const nodeIDToRectangle = {};
       while (!curItem.done) {
         const curNode = curItem.value;
-        const rectangle = PhysicsManager.createRectangle(curNode);
+        const rectangle = PhysicsManager.createRectangle(curNode, options);
         rectangles.push(rectangle);
         nodeIDToRectangle[curNode.getID()] = rectangle;
 
         curItem = iterator.next();
       }
       return { rectangles, nodeIDToRectangle };
-    }
-
-    static buildStaticRectangle(startingNode) {
-      const staticRectangle = PhysicsManager.createRectangle(startingNode);
-      Matter.Body.setStatic(staticRectangle, true);
-      return staticRectangle;
     }
 
     static buildInnerConstraints(startingNode, nodeIDToRectangle, options) {
@@ -1180,19 +1156,88 @@
         maxAngle: (cornerIndex + 1) * 90,
       };
     }
+
+    static calcForceOnVisualRectangle(windowAcc, rectangle, options) {
+      const negAcc = Matter.Vector.neg(windowAcc);
+      const force = Matter.Vector.mult(negAcc, rectangle.mass);
+      const correctedForce = PhysicsManager.correctForce(force);
+
+      // Randomly rotate the force to make an imperfect appearance
+      const angleRange = options.maxRandomRotate - options.minRandomRotate;
+      let randAngle = Math.random() * angleRange + options.minRandomRotate;
+      randAngle = GeometryUtil.degreeToRadian(randAngle);
+      const rotatedForce = Matter.Vector.rotate(correctedForce, randAngle);
+
+      // Randomly scale the force to make an imperfect appearance
+      const scaleRange = options.maxRandomScale - options.minRandomScale;
+      const randScale = Math.random() * scaleRange + options.minRandomScale;
+      const scaledForce = Matter.Vector.mult(rotatedForce, randScale);
+
+      return scaledForce;
+    }
   }
 
   class App {
     constructor() {
       // App constants
       this.globalBookmarkletName = 'JELLIFY_BOOKMARKLET';
+      this.globalOptionsName = 'JELLIFY_OPTIONS';
       this.globalDebugName = 'JELLIFY_DEBUG';
+      this.defaultOptions = {
+        tree: {
+          // How much margin between the parent and children visual nodes. Set
+          // a non-zero value to avoid exactly overlapping bounding box of the
+          // parent and child nodes
+          minMargin: 1,
+          // We limit the number of visual descendants to boost the performance.
+          // If a node has too many visual descendants we won't consider it as
+          // the starting node
+          minVisualDescendants: 0,
+          maxVisualDescendants: 30,
+          // We limit the height in the visual tree to avoid long stacked
+          // rectangles
+          maxVisualHeight: 10,
+        },
+        render: {
+          minFPS: 10,
+          maxFPS: 120,
+        },
+        physics: {
+          rectangle: {
+            mass: 1.0,
+          },
+          constraint: {
+            damping: 0.01,
+            // We apply higher stiffness to longer constraint, these values
+            // correspond to the shortest constraint and longest constraint
+            minStiffness: 0.01,
+            maxStiffness: 1.0,
+            // The exponent applied to stiffness calculation, higher value means
+            // less stiffness in the middle range
+            stiffnessCurveSoftness: 2.0,
+          },
+          acceleration: {
+            // How many samples to get the average acceleration of the window
+            // scroll
+            smoothness: 3,
+          },
+          force: {
+            minRandomRotate: -30,
+            maxRandomRotate: 30,
+            minRandomScale: 0.9,
+            maxRandomScale: 1.1,
+          },
+        },
+      };
 
-      this.treeManager = new TreeManager();
+      this.options = this.readOptions();
+
+      this.treeManager = new TreeManager(this.options.tree);
       this.physicsManager = new PhysicsManager(this.isDebugMode());
       this.jellifyEngine = new JellifyEngine(
         this.treeManager,
         this.physicsManager,
+        this.options,
       );
     }
 
@@ -1223,6 +1268,13 @@
 
         this.jellifyEngine.runAnimation();
       });
+    }
+
+    readOptions() {
+      if (typeof window[this.globalOptionsName] === 'undefined') {
+        return this.defaultOptions;
+      }
+      return window[this.globalOptionsName];
     }
 
     isLoaded() {
