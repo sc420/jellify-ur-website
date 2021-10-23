@@ -1,25 +1,8 @@
 # Jellify Your Website
 
-## Terms
+A bookmarklet that turns any website into a big yummy wobbly jelly.
 
-- Node: A rectangular area which is either a primitive or container
-- Valid node: A visible node that has non-zero rectangular area
-- Primitive node: The leaf DOM element, represented by `Matter.Body`
-- Container node: Contains more than 1 nodes, represented by 4 corner points as `Matter.Body`
-- Function `outer(x)`:
-  - If the parent node `parent(x)` contains only 1 valid child which is `x`, return `outer(parent(x))`
-  - If not, return `x`
-- Pattern: A specific way to connect the corner points of a container and its children nodes
-  - We use `Matter.Constraint` to connect from a corner point to another one
-  - For each corner point, we simply find the closest corner point of another node
-
-## Algorithm
-
-1. Find all valid primitive DOM elements `p`
-2. For each primitive element `p`, find `p' = outer(p)`
-3. Create a `Matter.Body` to represent `p'`
-4. For each `p'`, the parent node of `p'` now have more than 1 nodes, we need to connect them together using the pattern to form a new container node `c`
-5. Keep repeating the previous step until we have the biggest `c` that represents the `<body>` DOM element
+Inspired by [r/badUIbattles](https://www.reddit.com/r/baduibattles).
 
 ## Local Development Bookmarklet
 
