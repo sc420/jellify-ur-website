@@ -524,7 +524,7 @@
       return Matter.Vector.div(force, 1000000);
     }
 
-    static createRectangle(node, options) {
+    static createRectangle(node) {
       const rectangleOptions = PhysicsManager.getRectangleOptions(node);
       const boundingBox = node.getBoundingBox();
       const centerBox = GeometryUtil.boundingBoxToCenterBox(boundingBox);
@@ -535,8 +535,6 @@
         centerBox.height,
         rectangleOptions,
       );
-
-      Matter.Body.setMass(rectangle, options.mass);
       return rectangle;
     }
 
@@ -705,7 +703,7 @@
     }
 
     init() {
-      this.buildAllRectangles(this.options.physics.rectangle);
+      this.buildAllRectangles();
 
       this.buildAllConstraints(this.options.physics.constraint);
 
@@ -792,31 +790,28 @@
       });
     }
 
-    buildAllRectangles(options) {
-      this.staticRectangles = this.buildAllStaticRectangles(options);
+    buildAllRectangles() {
+      this.staticRectangles = this.buildAllStaticRectangles();
       console.debug(`Built ${this.staticRectangles.length} static rectangles`);
 
-      const dynamicRectResult = this.buildAllDynamicRectangles(options);
+      const dynamicRectResult = this.buildAllDynamicRectangles();
       this.dynamicRectangles = dynamicRectResult.rectangles;
       this.nodeIDToRectangle = dynamicRectResult.nodeIDToRectangle;
       console.debug(`Built ${this.dynamicRectangles.length} dynamic\
  rectangles`);
     }
 
-    buildAllStaticRectangles(options) {
+    buildAllStaticRectangles() {
       return this.treeManager.visualStartingNodes.map((startingNode) => {
-        return JellifyEngine.buildStaticRectangle(startingNode, options);
+        return JellifyEngine.buildStaticRectangle(startingNode);
       });
     }
 
-    buildAllDynamicRectangles(options) {
+    buildAllDynamicRectangles() {
       let allRectangles = [];
       let allNodeIDToRectangle = {};
       this.treeManager.visualStartingNodes.forEach((startingNode) => {
-        const result = JellifyEngine.buildDynamicRectangles(
-          startingNode,
-          options,
-        );
+        const result = JellifyEngine.buildDynamicRectangles(startingNode);
         const { rectangles, nodeIDToRectangle } = result;
 
         allRectangles = [...allRectangles, ...rectangles];
@@ -899,20 +894,17 @@
       });
     }
 
-    static buildStaticRectangle(startingNode, options) {
-      const staticRectangle = PhysicsManager.createRectangle(
-        startingNode,
-        options,
-      );
+    static buildStaticRectangle(startingNode) {
+      const staticRectangle = PhysicsManager.createRectangle(startingNode);
       Matter.Body.setStatic(staticRectangle, true);
       return staticRectangle;
     }
 
-    static buildDynamicRectangles(startingNode, options) {
+    static buildDynamicRectangles(startingNode) {
       const rectangles = [];
       const nodeIDToRectangle = {};
       TreeIterator.iterateVisualChildren(startingNode, (curNode) => {
-        const rectangle = PhysicsManager.createRectangle(curNode, options);
+        const rectangle = PhysicsManager.createRectangle(curNode);
         rectangles.push(rectangle);
         nodeIDToRectangle[curNode.getID()] = rectangle;
       });
@@ -1214,9 +1206,6 @@
           maxFPS: 120,
         },
         physics: {
-          rectangle: {
-            mass: 1.0,
-          },
           constraint: {
             damping: 0.01,
             // We apply higher stiffness to longer constraint, these values
