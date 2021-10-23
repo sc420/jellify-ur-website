@@ -478,9 +478,10 @@
   }
 
   class PhysicsManager {
-    constructor() {
+    constructor(isRender = false) {
+      this.isRender = isRender;
+
       this.engine = null;
-      this.runner = null;
       this.render = null;
       this.mouse = null;
     }
@@ -493,21 +494,21 @@
         },
       });
 
-      this.runner = Matter.Runner.create();
+      if (this.isRender) {
+        this.render = Matter.Render.create({
+          element: document.body,
+          engine: this.engine,
+          options: {
+            width: rootNode.getBoundingBox().width,
+            height: rootNode.getBoundingBox().height,
+            wireframes: true,
+          },
+        });
 
-      this.render = Matter.Render.create({
-        element: document.body,
-        engine: this.engine,
-        options: {
-          width: rootNode.getBoundingBox().width,
-          height: rootNode.getBoundingBox().height,
-          wireframes: true,
-        },
-      });
+        this.mouse = Matter.Mouse.create(this.render.canvas);
 
-      this.mouse = Matter.Mouse.create(this.render.canvas);
-
-      Matter.Render.run(this.render);
+        Matter.Render.run(this.render);
+      }
     }
 
     buildMouseConstraint() {
@@ -623,14 +624,15 @@
         distanceRatio,
         options.minStiffness,
         options.maxStiffness,
+        options.softness,
       );
 
       return { damping: 0.01, stiffness };
     }
 
-    static calcStiffness(ratio, minStiffness, maxStiffness) {
+    static calcStiffness(ratio, minStiffness, maxStiffness, softness) {
       const stiffnessRange = maxStiffness - minStiffness;
-      const poweredRatio = ratio ** 2;
+      const poweredRatio = ratio ** softness;
       return poweredRatio * stiffnessRange + minStiffness;
     }
   }
@@ -688,13 +690,14 @@
       this.windowScrollRenderHelper = new RenderHelper();
       this.physicsRenderHelper = new RenderHelper(
         10 /* minFPS */,
-        60, /* maxFPS */
+        120, /* maxFPS */
       );
 
       // Physics constants
       this.constraintOptions = {
-        minStiffness: 0.03,
+        minStiffness: 0.01,
         maxStiffness: 1.0,
+        softness: 2,
       };
       this.minDeflectForceAngle = -30; // degrees
       this.maxDeflectForceAngle = 30; // degrees
@@ -722,15 +725,17 @@
 
       this.buildAllConstraints(this.constraintOptions);
 
-      this.mouseConstraint = this.physicsManager.buildMouseConstraint();
-
       this.saveInitialRectanglePositions();
 
       this.physicsManager.addObjects(this.staticRectangles);
       this.physicsManager.addObjects(this.dynamicRectangles);
       this.physicsManager.addObjects(this.outermostConstraints);
       this.physicsManager.addObjects(this.innerConstraints);
-      this.physicsManager.addObjects(this.mouseConstraint);
+
+      if (this.isRender) {
+        this.mouseConstraint = this.physicsManager.buildMouseConstraint();
+        this.physicsManager.addObjects(this.mouseConstraint);
+      }
     }
 
     runAnimation() {
@@ -1179,10 +1184,12 @@
 
   class App {
     constructor() {
+      // App constants
       this.globalBookmarkletName = 'JELLIFY_BOOKMARKLET';
       this.globalDebugName = 'JELLIFY_DEBUG';
+
       this.treeManager = new TreeManager();
-      this.physicsManager = new PhysicsManager();
+      this.physicsManager = new PhysicsManager(this.isDebugMode());
       this.jellifyEngine = new JellifyEngine(
         this.treeManager,
         this.physicsManager,
@@ -1206,7 +1213,7 @@
 
         this.treeManager.init();
 
-        if (this.isDebugMode() || true) {
+        if (this.isDebugMode()) {
           this.treeManager.render();
         }
 
@@ -1229,6 +1236,10 @@
     setLoaded() {
       window[this.globalBookmarkletName] = true;
       console.info('Jellify is loaded');
+
+      if (this.isDebugMode()) {
+        console.info('Jellify debug mode is enabled');
+      }
     }
 
     static waitLibraries(onFinish) {
