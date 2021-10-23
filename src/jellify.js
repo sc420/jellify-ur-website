@@ -636,17 +636,21 @@
   }
 
   class RenderHelper {
-    constructor(maxFPS) {
+    constructor(minFPS = 0, maxFPS = Infinity) {
+      this.minFPS = minFPS; // frames/second
       this.maxFPS = maxFPS; // frames/second
 
-      this.minInterval = 1.0 / this.maxFPS;
+      this.minInterval = 1.0 / this.maxFPS; // seconds
+      this.maxInterval = 1.0 / this.minFPS; // seconds
       this.elapsedTime = 0; // seconds
       this.prevTimestamp = null; // seconds
       this.prevElapsedTime = null; // seconds
     }
 
     step(fnRender) {
-      // Reference: https://github.com/liabru/matter-js/issues/818
+      // Reference:
+      // - Matter.Runner.tick
+      // - https://github.com/liabru/matter-js/issues/818
       const curTimestamp = Date.now() / 1000.0;
       if (this.prevTimestamp === null) {
         // First step
@@ -655,6 +659,8 @@
       }
 
       this.elapsedTime = curTimestamp - this.prevTimestamp;
+      // Limit the elapsed time
+      this.elapsedTime = Math.min(this.elapsedTime, this.maxInterval);
 
       if (this.canRender()) {
         if (this.prevElapsedTime !== null) {
@@ -679,8 +685,11 @@
       this.physicsManager = physicsManager;
 
       // Rendering helpers
-      this.windowScrollRenderHelper = new RenderHelper(Infinity);
-      this.physicsRenderHelper = new RenderHelper(60 /* maxFPS */);
+      this.windowScrollRenderHelper = new RenderHelper();
+      this.physicsRenderHelper = new RenderHelper(
+        10 /* minFPS */,
+        60, /* maxFPS */
+      );
 
       // Physics constants
       this.constraintOptions = {
