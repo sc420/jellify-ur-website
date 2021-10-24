@@ -4,6 +4,12 @@ A bookmarklet that turns any website into a big yummy wobbly jelly.
 
 Inspired by [r/badUIbattles](https://www.reddit.com/r/baduibattles).
 
+## Supported Browsers
+
+- Chrome
+- Firefox
+- Edge
+
 ## Libraries Used
 
 - [jQuery](https://jquery.com/)
@@ -32,7 +38,3 @@ tree nodes and see the Matter.js canvas.
     ```javascript
     javascript:["https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js","https://cdn.jsdelivr.net/npm/matter-js@0.17.1/build/matter.min.js","http://localhost:5500/src/jellify.js"].forEach(t=>{const e=document.getElementsByTagName("head")[0],a=document.createElement("script");a.src=t,e.appendChild(a)});
     ```
-
-### Problems I Encountered
-
-- https://github.com/liabru/matter-js/issues/139
