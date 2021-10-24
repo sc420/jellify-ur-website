@@ -1312,6 +1312,7 @@
     waitPageToBeReady() {
       $(document).ready(() => {
         this.options = this.readOptions();
+        console.debug(`Options: ${JSON.stringify(this.options)}`);
 
         const isRender = this.isDebugMode();
 
@@ -1345,6 +1346,7 @@
         return this.defaultOptions;
       }
       const overrideOptions = window[this.globalOptionsName];
+      console.debug(`Overriding options: ${JSON.stringify(overrideOptions)}`);
       return Matter.Common.extend(this.defaultOptions, overrideOptions);
     }
 
