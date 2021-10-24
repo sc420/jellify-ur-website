@@ -1266,7 +1266,7 @@
             damping: 0.01,
             // We apply higher stiffness to longer constraint, these values
             // correspond to the shortest constraint and longest constraint
-            minStiffness: 0.001,
+            minStiffness: 0.003,
             maxStiffness: 1.0,
             // The exponent applied to stiffness calculation, higher value means
             // less stiffness in the middle range
