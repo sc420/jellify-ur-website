@@ -118,8 +118,9 @@
   }
 
   class TreeNode {
-    constructor($el) {
+    constructor($el, options) {
       this.$el = $el;
+      this.options = options;
 
       this.parent = null;
       this.children = [];
@@ -141,7 +142,12 @@
     }
 
     isEligible() {
-      return !this.isAbsolute() && !this.isFixed() && this.isVisible();
+      return (
+        !this.isAbsolute()
+        && !this.isFixed()
+        && this.isVisible()
+        && this.isBoundingBoxBigEnough()
+      );
     }
 
     isAbsolute() {
@@ -157,6 +163,14 @@
       const box = this.getBoundingBox();
       if (box.width <= 0 || box.height <= 0) return false;
       return true;
+    }
+
+    isBoundingBoxBigEnough() {
+      const boundingBox = this.getBoundingBox();
+      return (
+        boundingBox.width > this.options.minWidth
+        && boundingBox.height > this.options.minHeight
+      );
     }
 
     isRoot() {
@@ -347,7 +361,7 @@
     }
 
     buildTreeNodes($el) {
-      const node = new TreeNode($el);
+      const node = new TreeNode($el, this.options);
       const childrenElements = $el
         .children()
         .toArray()
@@ -389,7 +403,6 @@
 
       if (
         curNode.isEligible()
-        && this.isBoundingBoxBigEnough(curNode)
         && GeometryUtil.containsRect(
           visualParentNode.getBoundingBox(),
           curNode.getBoundingBox(),
@@ -406,14 +419,6 @@
       curNode.children.forEach((childNode) => {
         this.findVisualChildren(visualParentNode, childNode);
       });
-    }
-
-    isBoundingBoxBigEnough(node) {
-      const boundingBox = node.getBoundingBox();
-      return (
-        boundingBox.width > this.options.minWidth
-        && boundingBox.height > this.options.minHeight
-      );
     }
 
     findVisualRootNodes(node) {
@@ -702,9 +707,8 @@
       this.options = options;
       this.isRender = isRender;
 
-      // Rendering helpers
-      this.windowScrollRenderHelper = new RenderHelper();
-      this.physicsRenderHelper = new RenderHelper(
+      // Rendering helper
+      this.renderHelper = new RenderHelper(
         this.options.render.minFPS /* minFPS */,
         this.options.render.maxFPS, /* maxFPS */
       );
@@ -750,10 +754,9 @@
     }
 
     stepAnimation() {
-      const curScroll = Matter.Vector.create(window.scrollX, window.scrollY);
-
-      // Add window scroll sample to calculate window scroll acceleration
-      this.windowScrollRenderHelper.step((elapsedTime) => {
+      this.renderHelper.step((elapsedTime, prevElapsedTime) => {
+        // Add window scroll sample to calculate window scroll acceleration
+        const curScroll = Matter.Vector.create(window.scrollX, window.scrollY);
         if (this.prevScroll != null) {
           const scrollDiff = Matter.Vector.sub(curScroll, this.prevScroll);
           const stepWindowAcceleration = Matter.Vector.div(
@@ -765,10 +768,8 @@
         }
 
         this.prevScroll = curScroll;
-      });
 
-      // Update physics
-      this.physicsRenderHelper.step((elapsedTime, prevElapsedTime) => {
+        // Update physics
         this.applyForceToStartingRectangles();
 
         this.updateTransformOnVisualNodes();
@@ -1238,32 +1239,34 @@
       this.defaultOptions = {
         tree: {
           // We limit the minimal size to avoid building a very small rectangle
-          // that acts as a pivot in physics simulation
-          minWidth: 5,
-          minHeight: 5,
+          // to boost the performance, and also avoid building small rectangles
+          // that acts as pivots
+          minWidth: 30,
+          minHeight: 30,
           // How much margin between the parent and children visual nodes. Set
           // a non-zero value to avoid exactly overlapping bounding box of the
           // parent and child nodes
           minMargin: 5, // pixels
           // We limit the number of visual descendants to boost the performance.
           // If a node has too many visual descendants we won't consider it as
-          // the starting node
+          // the starting node. Set both numbers to 0 to disable stacked
+          // visualization
           minVisualDescendants: 0,
           maxVisualDescendants: 10,
           // We limit the height in the visual tree to avoid long stacked
-          // rectangles
+          // rectangles. Set the number to 0 to disable stacked visualization.
           maxVisualHeight: 5,
         },
         render: {
           minFPS: 10,
-          maxFPS: 120,
+          maxFPS: 60,
         },
         physics: {
           constraint: {
             damping: 0.01,
             // We apply higher stiffness to longer constraint, these values
             // correspond to the shortest constraint and longest constraint
-            minStiffness: 0.01,
+            minStiffness: 0.001,
             maxStiffness: 1.0,
             // The exponent applied to stiffness calculation, higher value means
             // less stiffness in the middle range
@@ -1277,8 +1280,8 @@
           force: {
             // Apply the force to an offset position from the center (0-1).
             // 0 means no offset, 1 means shift to the edge
-            minRandomShift: -0.01, // ratio
-            maxRandomShift: 0.01, // ratio
+            minRandomShift: -0.05, // ratio
+            maxRandomShift: 0.05, // ratio
             // Randomly rotate the force to make it chaotic
             minRandomRotate: -30, // degrees
             maxRandomRotate: 30, // degrees
