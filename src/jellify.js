@@ -140,6 +140,18 @@
       this.cachedBoundingBox = null;
     }
 
+    isEligible() {
+      return !this.isAbsolute() && !this.isFixed() && this.isVisible();
+    }
+
+    isAbsolute() {
+      return this.$el.css('position') === 'absolute';
+    }
+
+    isFixed() {
+      return this.$el.css('position') === 'fixed';
+    }
+
     isVisible() {
       if (!this.$el.is(':visible')) return false;
       const box = this.getBoundingBox();
@@ -195,7 +207,7 @@
     }
 
     render(borderStyle = 'solid', borderColor = 'red') {
-      if (!this.isVisible()) return;
+      if (!this.isEligible()) return;
 
       // Reference: https://stackoverflow.com/a/26206753
       this.$el.css('outline', `1px ${borderStyle} ${borderColor}`);
@@ -292,7 +304,7 @@
 
       // These information are saved just for debugging
       this.treeNodeCount = 0;
-      this.visibleTreeNodeCount = 0;
+      this.eligibleTreeNodeCount = 0;
       this.visualTreeEdgeCount = 0;
     }
 
@@ -300,7 +312,7 @@
       const $body = $('body');
       this.rootNode = this.buildTreeNodes($body);
       console.debug(`Created ${this.treeNodeCount} tree nodes`);
-      console.debug(`${this.visibleTreeNodeCount} of tree nodes are visible`);
+      console.debug(`${this.eligibleTreeNodeCount} of tree nodes are eligible`);
 
       TreeIterator.iterateChildren(
         this.rootNode,
@@ -356,15 +368,15 @@
 
       // Accumulate the counters
       this.treeNodeCount += 1;
-      if (node.isVisible()) {
-        this.visibleTreeNodeCount += 1;
+      if (node.isEligible()) {
+        this.eligibleTreeNodeCount += 1;
       }
 
       return node;
     }
 
     buildVisualChildren(visualParentNode) {
-      if (!visualParentNode.isVisible()) return;
+      if (!visualParentNode.isEligible()) return;
 
       visualParentNode.children.forEach((childNode) => {
         this.findVisualChildren(visualParentNode, childNode);
@@ -372,11 +384,12 @@
     }
 
     findVisualChildren(visualParentNode, curNode) {
-      if (!curNode.isVisible()) return;
+      if (!curNode.isEligible()) return;
       if (curNode.visualParent) return;
 
       if (
-        this.isBoundingBoxBigEnough(curNode)
+        curNode.isEligible()
+        && this.isBoundingBoxBigEnough(curNode)
         && GeometryUtil.containsRect(
           visualParentNode.getBoundingBox(),
           curNode.getBoundingBox(),
@@ -404,7 +417,7 @@
     }
 
     findVisualRootNodes(node) {
-      if (!node.isVisible() || !node.isVisualRoot()) return;
+      if (!node.isEligible() || !node.isVisualRoot()) return;
       this.visualRootNodes.push(node);
     }
 
