@@ -404,7 +404,7 @@
     }
 
     buildTreeNodes($el) {
-      const node = new TreeNode($el, this.options);
+      const node = new TreeNode($el, this.options.tree);
       const childrenElements = $el
         .children()
         .toArray()
@@ -449,7 +449,7 @@
         && GeometryUtil.containsRect(
           visualParentNode.getBoundingBox(),
           curNode.getBoundingBox(),
-          this.options.minMargin,
+          this.options.tree.minMargin - this.options.geometry.toleranceDistance,
         )
       ) {
         visualParentNode.addVisualChild(curNode);
@@ -507,9 +507,9 @@
     findVisualStartingNodes(node) {
       if (
         !node.canBeStartingNode
-        || node.numVisualDescendants < this.options.minVisualDescendants
-        || node.numVisualDescendants > this.options.maxVisualDescendants
-        || node.visualHeight > this.options.maxVisualHeight
+        || node.numVisualDescendants < this.options.tree.minVisualDescendants
+        || node.numVisualDescendants > this.options.tree.maxVisualDescendants
+        || node.visualHeight > this.options.tree.maxVisualHeight
       ) {
         return;
       }
@@ -1459,7 +1459,7 @@
 
         const isRender = this.isDebugMode();
 
-        this.treeManager = new TreeManager(this.options.tree);
+        this.treeManager = new TreeManager(this.options);
         this.physicsManager = new PhysicsManager(isRender);
         this.jellifyEngine = new JellifyEngine(
           this.treeManager,
