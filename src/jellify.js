@@ -452,7 +452,8 @@
       // Save the count
       node.setNumVisualDescendants(count);
 
-      return count + 1;
+      if (node.visualChildren.length > 0) return count;
+      return 1;
     }
 
     calcVisualHeight(node) {
