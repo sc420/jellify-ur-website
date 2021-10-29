@@ -64,7 +64,7 @@
 
     static distance(pos1, pos2) {
       const diff = Matter.Vector.sub(pos2, pos1);
-      return Matter.Vector.magnitudeSquared(diff);
+      return Matter.Vector.magnitude(diff);
     }
 
     static angle(pos1, pos2) {
@@ -653,12 +653,12 @@
       const distanceRatio = distance / maxDiagonalLength;
       const stiffness = this.calcStiffness(
         distanceRatio,
-        options.minStiffness,
-        options.maxStiffness,
-        options.stiffnessCurveSoftness,
+        options.physics.constraint.minStiffness,
+        options.physics.constraint.maxStiffness,
+        options.physics.constraint.stiffnessCurveSoftness,
       );
 
-      return { damping: options.damping, stiffness };
+      return { damping: options.physics.constraint.damping, stiffness };
     }
 
     static calcStiffness(ratio, minStiffness, maxStiffness, softness) {
@@ -749,7 +749,7 @@
     init() {
       this.buildAllRectangles();
 
-      this.buildAllConstraints(this.options.physics.constraint);
+      this.buildAllConstraints(this.options);
 
       this.saveInitialRectanglePositions();
 
@@ -772,7 +772,7 @@
       this.renderHelper.step((elapsedTime, prevElapsedTime) => {
         // Add window scroll sample to calculate window scroll acceleration
         const curScroll = Matter.Vector.create(window.scrollX, window.scrollY);
-        if (this.prevScroll != null) {
+        if (this.prevScroll !== null) {
           const scrollDiff = Matter.Vector.sub(curScroll, this.prevScroll);
           const stepWindowAcceleration = Matter.Vector.div(
             scrollDiff,
@@ -1084,7 +1084,9 @@
             otherNodes,
             angleRange.minAngle,
             angleRange.maxAngle,
+            options.geometry.toleranceDistance,
           );
+
           results.forEach((result) => {
             const { nearestNode, nearestCornerIndex, nearestCorner } = result;
             const nearestRectangle = nodeIDToRectangle[nearestNode.getID()];
@@ -1165,9 +1167,10 @@
       otherNodes,
       minAngle = 0,
       maxAngle = 360,
+      toleranceDistance = 0,
     ) {
-      let minDist = Infinity;
       let results = [];
+      let minDist = Infinity;
       otherNodes.forEach((otherNode) => {
         const boundingBox = otherNode.getBoundingBox();
         const otherCorners = GeometryUtil.getCornerPoints(boundingBox);
@@ -1177,24 +1180,24 @@
           if (
             !(vectorAngle >= minAngle && vectorAngle <= maxAngle)
             && !(vectorAngleCCW >= minAngle && vectorAngleCCW <= maxAngle)
+            && GeometryUtil.distance(corner, otherCorner) > toleranceDistance
           ) {
             return;
           }
 
           const dist = GeometryUtil.distance(corner, otherCorner);
           if (dist <= minDist) {
-            if (dist < minDist) {
-              minDist = dist;
-              results = [];
-            }
+            results = [];
             results.push({
               nearestNode: otherNode,
               nearestCornerIndex: otherCornerIndex,
               nearestCorner: otherCorner,
             });
+            minDist = dist;
           }
         });
       });
+      // Either empty or 1 result
       return results;
     }
 
@@ -1301,6 +1304,13 @@
         render: {
           minFPS: 30,
           maxFPS: 60,
+        },
+        geometry: {
+          // When two points are too close the angle calculation may not be
+          // reliable (for example, angle(p1, p2) = 180 when p1 and p2 are very
+          // close). Instead, we calculate the distance to see if we can treat
+          // two points the same
+          toleranceDistance: 1.0,
         },
         physics: {
           constraint: {
