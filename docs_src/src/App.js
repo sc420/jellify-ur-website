@@ -179,7 +179,10 @@ class App extends React.Component {
                 containing rectangles as its children on the hierarchical tree
                 with <code>getBoundingClientRect</code>
               </li>
-              <li>Build objects and constraints in Matter.js world</li>
+              <li>
+                Build objects and constraints in Matter.js world (by finding
+                nearest corner points and connecting them together)
+              </li>
               <li>Measure the acceleration of the scroll bar values</li>
               <li>
                 Apply force on each outermost rectangles (I break down the
@@ -242,8 +245,7 @@ class App extends React.Component {
 
             <h2>Why You Should Apply It to Your Website</h2>
             <p>
-              The study finds this kind of bookmarklet provides some proven
-              benefits:
+              This bookmarklet can provide the following benefits:
             </p>
 
             <ul>
@@ -282,8 +284,8 @@ class App extends React.Component {
 
             <h2>Special Thanks</h2>
             <p>
-              Thanks for my SO for coming up the idea to arrange the gummy bears
-              and the image editing. I'm not very familiar with PhotoShop.
+              Thanks my SO for coming up the idea to arrange the gummy bears
+              and the image editing.
             </p>
           </section>
         </main>

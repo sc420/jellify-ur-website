@@ -20,6 +20,16 @@
       );
     }
 
+    static containsPoint(rect1, pos, margin = 0) {
+      const rect2 = {
+        x: pos.x,
+        y: pos.y,
+        width: 0,
+        height: 0,
+      };
+      return GeometryUtil.containsRect(rect1, rect2, margin);
+    }
+
     static getCornerPoints(rect) {
       const xRight = rect.x + rect.width;
       const yBottom = rect.y + rect.height;
@@ -43,6 +53,15 @@
     static diagonalLength(rect) {
       const diagonalVector = Matter.Vector.create(rect.width, rect.height);
       return Matter.Vector.magnitude(diagonalVector);
+    }
+
+    static offsetBoundingBox(rect, offset) {
+      return {
+        x: rect.x + offset.x,
+        y: rect.y + offset.y,
+        width: rect.width,
+        height: rect.height,
+      };
     }
 
     static absToRelPos(absPos, rect) {
@@ -85,7 +104,7 @@
     }
   }
 
-  class XPathUtil {
+  class ElementUtil {
     // Reference: https://stackoverflow.com/a/2631931
     static getPathTo(element) {
       if (element.id !== '') return `id("${element.id}")`;
@@ -96,7 +115,7 @@
       for (let i = 0; i < siblings.length; i += 1) {
         const sibling = siblings[i];
         if (sibling === element) {
-          const basePath = XPathUtil.getPathTo(element.parentNode);
+          const basePath = ElementUtil.getPathTo(element.parentNode);
           return `${basePath}/${element.tagName}[${ix + 1}]`;
         }
         if (sibling.nodeType === 1 && sibling.tagName === element.tagName) {
@@ -104,6 +123,14 @@
         }
       }
       return '';
+    }
+
+    static selfOrParentHasStyle($el, name, value) {
+      const parentElements = $el.parents().toArray();
+      if ($el.css(name) === value) return true;
+      return parentElements.some((parentEl) => {
+        return $(parentEl).css(name) === value;
+      });
     }
   }
 
@@ -149,25 +176,21 @@
       this.canBeStartingNode = true;
       this.isStartingNode = false;
 
+      // Will be updated when running the animation
+      this.isSleeping = false;
+
       this.cachedID = null;
       this.cachedBoundingBox = null;
     }
 
     isEligible() {
       return (
-        !this.isAbsolute()
-        && !this.isFixed()
+        !ElementUtil.selfOrParentHasStyle(this.$el, 'position', 'absolute')
+        && !ElementUtil.selfOrParentHasStyle(this.$el, 'position', 'fixed')
+        && !ElementUtil.selfOrParentHasStyle(this.$el, 'position', 'sticky')
         && this.isVisible()
         && this.isBoundingBoxBigEnough()
       );
-    }
-
-    isAbsolute() {
-      return this.$el.css('position') === 'absolute';
-    }
-
-    isFixed() {
-      return this.$el.css('position') === 'fixed';
     }
 
     isVisible() {
@@ -225,11 +248,19 @@
       this.isStartingNode = true;
     }
 
+    setSleeping(isSleeping) {
+      this.isSleeping = isSleeping;
+    }
+
     setTransform(translation, rotation) {
       const translateStr = `translate(${translation.x}px, ${translation.y}px)`;
       const rotationStr = `rotate(${rotation}rad)`;
 
       this.$el.css('transform', `${translateStr} ${rotationStr}`);
+    }
+
+    clearTransform() {
+      this.$el.css('transform', '');
     }
 
     render(borderStyle = 'solid', borderColor = 'red') {
@@ -242,7 +273,7 @@
 
     getID() {
       if (!this.cachedID) {
-        this.cachedID = XPathUtil.getPathTo(this.$el.get(0));
+        this.cachedID = ElementUtil.getPathTo(this.$el.get(0));
       }
       return this.cachedID;
     }
@@ -743,8 +774,13 @@
         this.options.physics.acceleration.smoothness,
       );
 
-      // Transform constraints
-      this.translationBoundingBox = JellifyEngine.getTranslationBoundingBox();
+      // Animation constraints
+      this.animationBoundingBox = JellifyEngine.getAnimationBoundingBox(
+        this.options.geometry,
+      );
+      this.translationBoundingBox = JellifyEngine.getTranslationBoundingBox(
+        this.options.geometry,
+      );
     }
 
     init() {
@@ -785,6 +821,8 @@
 
         this.prevScroll = curScroll;
 
+        this.makeStartingRectanglesSleepIfNotVisible(curScroll);
+
         // Update physics
         this.applyForceToStartingRectangles();
 
@@ -798,10 +836,39 @@
       window.requestAnimationFrame(this.stepAnimation.bind(this));
     }
 
+    makeStartingRectanglesSleepIfNotVisible(curScroll) {
+      this.treeManager.visualStartingNodes.forEach((startingNode) => {
+        const boundingBox = startingNode.getBoundingBox();
+        const offset = Matter.Vector.neg(curScroll);
+        const offsetBoundingBox = GeometryUtil.offsetBoundingBox(
+          boundingBox,
+          offset,
+        );
+        const isVisible = GeometryUtil.containsRect(
+          this.animationBoundingBox,
+          offsetBoundingBox,
+        );
+
+        if (isVisible && !startingNode.isSleeping) return;
+        if (!isVisible && startingNode.isSleeping) return;
+
+        // Update sleeping status
+        const newSleeping = !startingNode.isSleeping;
+        startingNode.setSleeping(newSleeping);
+        TreeIterator.iterateVisualChildren(startingNode, (node) => {
+          const rectangle = this.nodeIDToRectangle[node.getID()];
+          Matter.Sleeping.set(rectangle, newSleeping);
+          if (newSleeping) node.clearTransform();
+        });
+      });
+    }
+
     applyForceToStartingRectangles() {
       const windowAcc = this.smoothWindowAcceleration.getSmoothVector();
 
       this.treeManager.visualStartingNodes.forEach((startingNode) => {
+        if (startingNode.isSleeping) return;
+
         const rectangle = this.nodeIDToRectangle[startingNode.getID()];
 
         const applyPosition = JellifyEngine.calcApplyForcePosition(
@@ -821,6 +888,8 @@
 
     updateTransformOnVisualNodes() {
       this.treeManager.visualStartingNodes.forEach((startingNode) => {
+        if (startingNode.isSleeping) return;
+
         TreeIterator.iterateVisualChildren(startingNode, (node) => {
           const rectangle = this.nodeIDToRectangle[node.getID()];
           const curPosition = rectangle.position;
@@ -1262,15 +1331,31 @@
       return scaledForce;
     }
 
-    static getTranslationBoundingBox() {
+    static getAnimationBoundingBox(options) {
+      const windowWidth = $(window).width();
+      const windowHeight = $(window).height();
+      // Extend the window bounding box outward
+      const zoom = options.animationAreaZoom;
+      const offsetFactor = -1 * ((zoom - 1) / 2);
+      return {
+        x: offsetFactor * windowWidth,
+        y: offsetFactor * windowHeight,
+        width: zoom * windowWidth,
+        height: zoom * windowHeight,
+      };
+    }
+
+    static getTranslationBoundingBox(options) {
       const documentWidth = $(document).width();
       const documentHeight = $(document).height();
       // Extend the document bounding box outward
+      const zoom = options.animationAreaZoom;
+      const offsetFactor = -1 * ((zoom - 1) / 2);
       return {
-        x: -1 * documentWidth,
-        y: -1 * documentHeight,
-        width: 3 * documentWidth,
-        height: 3 * documentHeight,
+        x: offsetFactor * documentWidth,
+        y: offsetFactor * documentHeight,
+        width: zoom * documentWidth,
+        height: zoom * documentHeight,
       };
     }
   }
@@ -1307,6 +1392,12 @@
           maxFPS: 60,
         },
         geometry: {
+          // If the element falls outside the zoomed out area of the viewport,
+          // we stop animating the object to optimize the performance
+          animationAreaZoom: 5,
+          // If the Matter.js rectangle is positioned beyond the zoomed out area
+          // of the document, we constrain the translation
+          translationAreaZoom: 5,
           // When two points are too close the angle calculation may not be
           // reliable (for example, angle(p1, p2) = 180 when p1 and p2 are very
           // close). Instead, we calculate the distance to see if we can treat

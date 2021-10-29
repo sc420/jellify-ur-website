@@ -1,4 +1,4 @@
-// Original code of the minified bookmarklet (default version)
+// Original code of the minified bookmarklet (debug version)
 //
 // How to create the bookmarklet:
 // 1. Go to https://www.toptal.com/developers/javascript-minifier/
@@ -7,6 +7,12 @@
 
 (() => {
   window.JELLIFY_DEBUG = 1;
+  window.JELLIFY_OPTIONS = {
+    geometry: {
+      animationAreaZoom: Infinity,
+      translationAreaZoom: Infinity,
+    },
+  };
   const urls = [
     // Dependencies should be loaded first
     'https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js',
