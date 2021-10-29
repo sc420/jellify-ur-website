@@ -1371,8 +1371,8 @@
           // We limit the minimal size to avoid building a very small rectangle
           // to boost the performance, and also avoid building small rectangles
           // that acts as pivots
-          minWidth: 30,
-          minHeight: 30,
+          minWidth: 10,
+          minHeight: 10,
           // How much margin between the parent and children visual nodes. Set
           // a non-zero value to avoid exactly overlapping bounding box of the
           // parent and child nodes
