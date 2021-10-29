@@ -13,10 +13,10 @@
   class GeometryUtil {
     static containsRect(rect1, rect2, margin = 0) {
       return (
-        rect1.x + margin <= rect2.x &&
-        rect2.x + rect2.width + margin <= rect1.x + rect1.width &&
-        rect1.y + margin <= rect2.y &&
-        rect2.y + rect2.height + margin <= rect1.y + rect1.height
+        rect1.x + margin <= rect2.x
+        && rect2.x + rect2.width + margin <= rect1.x + rect1.width
+        && rect1.y + margin <= rect2.y
+        && rect2.y + rect2.height + margin <= rect1.y + rect1.height
       );
     }
 
@@ -50,9 +50,21 @@
       return Matter.Vector.sub(absPos, centerBox);
     }
 
+    static constrainPosInBoundingBox(pos, rect) {
+      const constrainedX = Math.min(
+        Math.max(pos.x, rect.x),
+        rect.x + rect.width,
+      );
+      const constrainedY = Math.min(
+        Math.max(pos.y, rect.y),
+        rect.y + rect.height,
+      );
+      return Matter.Vector.create(constrainedX, constrainedY);
+    }
+
     static distance(pos1, pos2) {
       const diff = Matter.Vector.sub(pos2, pos1);
-      return Matter.Vector.magnitudeSquared(diff);
+      return Matter.Vector.magnitude(diff);
     }
 
     static angle(pos1, pos2) {
@@ -76,7 +88,7 @@
   class XPathUtil {
     // Reference: https://stackoverflow.com/a/2631931
     static getPathTo(element) {
-      if (element.id !== "") return `id("${element.id}")`;
+      if (element.id !== '') return `id("${element.id}")`;
       if (element === document.body) return element.tagName;
 
       let ix = 0;
@@ -91,7 +103,7 @@
           ix += 1;
         }
       }
-      return "";
+      return '';
     }
   }
 
@@ -143,23 +155,23 @@
 
     isEligible() {
       return (
-        !this.isAbsolute() &&
-        !this.isFixed() &&
-        this.isVisible() &&
-        this.isBoundingBoxBigEnough()
+        !this.isAbsolute()
+        && !this.isFixed()
+        && this.isVisible()
+        && this.isBoundingBoxBigEnough()
       );
     }
 
     isAbsolute() {
-      return this.$el.css("position") === "absolute";
+      return this.$el.css('position') === 'absolute';
     }
 
     isFixed() {
-      return this.$el.css("position") === "fixed";
+      return this.$el.css('position') === 'fixed';
     }
 
     isVisible() {
-      if (!this.$el.is(":visible")) return false;
+      if (!this.$el.is(':visible')) return false;
       const box = this.getBoundingBox();
       if (box.width <= 0 || box.height <= 0) return false;
       return true;
@@ -168,8 +180,8 @@
     isBoundingBoxBigEnough() {
       const boundingBox = this.getBoundingBox();
       return (
-        boundingBox.width > this.options.minWidth &&
-        boundingBox.height > this.options.minHeight
+        boundingBox.width > this.options.minWidth
+        && boundingBox.height > this.options.minHeight
       );
     }
 
@@ -217,15 +229,15 @@
       const translateStr = `translate(${translation.x}px, ${translation.y}px)`;
       const rotationStr = `rotate(${rotation}rad)`;
 
-      this.$el.css("transform", `${translateStr} ${rotationStr}`);
+      this.$el.css('transform', `${translateStr} ${rotationStr}`);
     }
 
-    render(borderStyle = "solid", borderColor = "red") {
+    render(borderStyle = 'solid', borderColor = 'red') {
       if (!this.isEligible()) return;
 
       // Reference: https://stackoverflow.com/a/26206753
-      this.$el.css("outline", `1px ${borderStyle} ${borderColor}`);
-      this.$el.css("outline-offset", "-1px");
+      this.$el.css('outline', `1px ${borderStyle} ${borderColor}`);
+      this.$el.css('outline-offset', '-1px');
     }
 
     getID() {
@@ -257,7 +269,7 @@
       this.rootNode = rootNode;
     }
 
-    *getChildrenIterator() {
+    * getChildrenIterator() {
       let queue = [this.rootNode];
       while (queue.length > 0) {
         const node = queue.shift();
@@ -267,7 +279,7 @@
       }
     }
 
-    *getVisualChildrenIterator() {
+    * getVisualChildrenIterator() {
       let queue = [this.rootNode];
       while (queue.length > 0) {
         const node = queue.shift();
@@ -323,37 +335,37 @@
     }
 
     init() {
-      const $body = $("body");
+      const $body = $('body');
       this.rootNode = this.buildTreeNodes($body);
       console.debug(`Created ${this.treeNodeCount} tree nodes`);
       console.debug(`${this.eligibleTreeNodeCount} of tree nodes are eligible`);
 
       TreeIterator.iterateChildren(
         this.rootNode,
-        this.buildVisualChildren.bind(this)
+        this.buildVisualChildren.bind(this),
       );
       console.debug(`Built ${this.visualTreeEdgeCount} visual tree edges`);
 
       TreeIterator.iterateChildren(
         this.rootNode,
-        this.findVisualRootNodes.bind(this)
+        this.findVisualRootNodes.bind(this),
       );
       console.debug(`Found ${this.visualRootNodes.length} visual root nodes`);
 
       this.visualRootNodes.forEach((visualRootNode) => {
         TreeIterator.iterateVisualChildren(
           visualRootNode,
-          this.countVisualDescendants.bind(this)
+          this.countVisualDescendants.bind(this),
         );
 
         TreeIterator.iterateVisualChildren(
           visualRootNode,
-          this.calcVisualHeight.bind(this)
+          this.calcVisualHeight.bind(this),
         );
 
         TreeIterator.iterateVisualChildren(
           visualRootNode,
-          this.findVisualStartingNodes.bind(this)
+          this.findVisualStartingNodes.bind(this),
         );
       });
 
@@ -402,11 +414,11 @@
       if (curNode.visualParent) return;
 
       if (
-        curNode.isEligible() &&
-        GeometryUtil.containsRect(
+        curNode.isEligible()
+        && GeometryUtil.containsRect(
           visualParentNode.getBoundingBox(),
           curNode.getBoundingBox(),
-          this.options.minMargin
+          this.options.minMargin,
         )
       ) {
         visualParentNode.addVisualChild(curNode);
@@ -440,7 +452,8 @@
       // Save the count
       node.setNumVisualDescendants(count);
 
-      return count + 1;
+      if (node.visualChildren.length > 0) return count;
+      return 1;
     }
 
     calcVisualHeight(node) {
@@ -462,10 +475,10 @@
 
     findVisualStartingNodes(node) {
       if (
-        !node.canBeStartingNode ||
-        node.numVisualDescendants < this.options.minVisualDescendants ||
-        node.numVisualDescendants > this.options.maxVisualDescendants ||
-        node.visualHeight > this.options.maxVisualHeight
+        !node.canBeStartingNode
+        || node.numVisualDescendants < this.options.minVisualDescendants
+        || node.numVisualDescendants > this.options.maxVisualDescendants
+        || node.visualHeight > this.options.maxVisualHeight
       ) {
         return;
       }
@@ -490,9 +503,9 @@
     static renderVisualChildren(startingNode) {
       TreeIterator.iterateVisualChildren(startingNode, (curNode) => {
         if (curNode.getID() === startingNode.getID()) {
-          curNode.render("solid", "red");
+          curNode.render('solid', 'red');
         } else {
-          curNode.render("dotted", "blue");
+          curNode.render('dotted', 'blue');
         }
       });
     }
@@ -562,7 +575,7 @@
         centerBox.y,
         centerBox.width,
         centerBox.height,
-        rectangleOptions
+        rectangleOptions,
       );
       return rectangle;
     }
@@ -572,7 +585,7 @@
       staticRect,
       startingRect,
       corner,
-      options
+      options,
     ) {
       return PhysicsManager.createConstraint(
         startingNode,
@@ -581,7 +594,7 @@
         startingRect,
         corner,
         corner,
-        options
+        options,
       );
     }
 
@@ -592,7 +605,7 @@
       bodyB,
       cornerA,
       cornerB,
-      options
+      options,
     ) {
       const boundingBoxA = nodeA.getBoundingBox();
       const boundingBoxB = nodeB.getBoundingBox();
@@ -603,7 +616,7 @@
         boundingBoxB,
         pointA,
         pointB,
-        options
+        options,
       );
       return Matter.Constraint.create({
         bodyA,
@@ -630,7 +643,7 @@
       boundingBoxB,
       pointA,
       pointB,
-      options
+      options,
     ) {
       const diagonalLengthA = GeometryUtil.diagonalLength(boundingBoxA);
       const diagonalLengthB = GeometryUtil.diagonalLength(boundingBoxB);
@@ -641,12 +654,12 @@
       const distanceRatio = distance / maxDiagonalLength;
       const stiffness = this.calcStiffness(
         distanceRatio,
-        options.minStiffness,
-        options.maxStiffness,
-        options.stiffnessCurveSoftness
+        options.physics.constraint.minStiffness,
+        options.physics.constraint.maxStiffness,
+        options.physics.constraint.stiffnessCurveSoftness,
       );
 
-      return { damping: options.damping, stiffness };
+      return { damping: options.physics.constraint.damping, stiffness };
     }
 
     static calcStiffness(ratio, minStiffness, maxStiffness, softness) {
@@ -710,7 +723,7 @@
       // Rendering helper
       this.renderHelper = new RenderHelper(
         this.options.render.minFPS /* minFPS */,
-        this.options.render.maxFPS /* maxFPS */
+        this.options.render.maxFPS, /* maxFPS */
       );
 
       // Physics objects
@@ -727,14 +740,17 @@
       // Window scroll acceleration
       this.prevScroll = null;
       this.smoothWindowAcceleration = new SmoothVector(
-        this.options.physics.acceleration.smoothness
+        this.options.physics.acceleration.smoothness,
       );
+
+      // Transform constraints
+      this.translationBoundingBox = JellifyEngine.getTranslationBoundingBox();
     }
 
     init() {
       this.buildAllRectangles();
 
-      this.buildAllConstraints(this.options.physics.constraint);
+      this.buildAllConstraints(this.options);
 
       this.saveInitialRectanglePositions();
 
@@ -757,11 +773,11 @@
       this.renderHelper.step((elapsedTime, prevElapsedTime) => {
         // Add window scroll sample to calculate window scroll acceleration
         const curScroll = Matter.Vector.create(window.scrollX, window.scrollY);
-        if (this.prevScroll != null) {
+        if (this.prevScroll !== null) {
           const scrollDiff = Matter.Vector.sub(curScroll, this.prevScroll);
           const stepWindowAcceleration = Matter.Vector.div(
             scrollDiff,
-            elapsedTime
+            elapsedTime,
           );
 
           this.smoothWindowAcceleration.addSample(stepWindowAcceleration);
@@ -791,12 +807,12 @@
         const applyPosition = JellifyEngine.calcApplyForcePosition(
           startingNode,
           rectangle,
-          this.options.physics.force
+          this.options.physics.force,
         );
         const force = JellifyEngine.calcForceOnVisualRectangle(
           windowAcc,
           rectangle,
-          this.options.physics.force
+          this.options.physics.force,
         );
 
         Matter.Body.applyForce(rectangle, applyPosition, force);
@@ -808,8 +824,16 @@
         TreeIterator.iterateVisualChildren(startingNode, (node) => {
           const rectangle = this.nodeIDToRectangle[node.getID()];
           const curPosition = rectangle.position;
+          // If we don't constrain the translation, the values may go wild
+          const constrainedPosition = GeometryUtil.constrainPosInBoundingBox(
+            curPosition,
+            this.translationBoundingBox,
+          );
           const origPosition = this.initialPositions[node.getID()];
-          const translation = Matter.Vector.sub(curPosition, origPosition);
+          const translation = Matter.Vector.sub(
+            constrainedPosition,
+            origPosition,
+          );
 
           node.setTransform(translation, rectangle.angle);
         });
@@ -856,14 +880,14 @@
       this.outermostConstraints = this.buildAllOutermostConstraints(
         this.staticRectangles,
         this.nodeIDToRectangle,
-        options
+        options,
       );
       console.debug(`Built ${this.outermostConstraints.length} outermost\
  constraints`);
 
       this.innerConstraints = this.buildAllInnerConstraints(
         this.nodeIDToRectangle,
-        options
+        options,
       );
       console.debug(`Built ${this.innerConstraints.length} inner constraints`);
     }
@@ -885,7 +909,7 @@
             staticRectangle,
             startingRectangle,
             corner,
-            options
+            options,
           );
           allConstraints.push(constraint);
         });
@@ -899,7 +923,7 @@
         const constraints = JellifyEngine.buildInnerConstraints(
           startingNode,
           nodeIDToRectangle,
-          options
+          options,
         );
 
         allConstraints = [...allConstraints, ...constraints];
@@ -914,7 +938,7 @@
         TreeIterator.iterateVisualChildren(startingNode, (node) => {
           const rectangle = this.nodeIDToRectangle[node.getID()];
           this.initialPositions[node.getID()] = Matter.Vector.clone(
-            rectangle.position
+            rectangle.position,
           );
         });
       });
@@ -945,7 +969,7 @@
         result = JellifyEngine.buildDiagonalConstraints(
           curNode,
           nodeIDToRectangle,
-          options
+          options,
         );
         const { diagonalConstraints, excludedCorners } = result;
 
@@ -954,7 +978,7 @@
           curNode,
           excludedCorners,
           nodeIDToRectangle,
-          options
+          options,
         );
         const { interConstraints, unconnectedCorners } = result;
 
@@ -964,7 +988,7 @@
           curNode,
           unconnectedCorners,
           nodeIDToRectangle,
-          options
+          options,
         );
 
         constraints = [
@@ -990,7 +1014,7 @@
       corners.forEach((corner) => {
         const results = JellifyEngine.findNearestCorners(
           corner,
-          parentNode.visualChildren
+          parentNode.visualChildren,
         );
         results.forEach((result) => {
           const { nearestNode, nearestCornerIndex, nearestCorner } = result;
@@ -1002,7 +1026,7 @@
             nearestRectangle,
             corner,
             nearestCorner,
-            options
+            options,
           );
 
           diagonalConstraints.push(constraint);
@@ -1020,7 +1044,7 @@
       parentNode,
       excludedCorners,
       nodeIDToRectangle,
-      options
+      options,
     ) {
       const interConstraints = [];
       const unconnectedCorners = [];
@@ -1060,8 +1084,10 @@
             corner,
             otherNodes,
             angleRange.minAngle,
-            angleRange.maxAngle
+            angleRange.maxAngle,
+            options.geometry.toleranceDistance,
           );
+
           results.forEach((result) => {
             const { nearestNode, nearestCornerIndex, nearestCorner } = result;
             const nearestRectangle = nodeIDToRectangle[nearestNode.getID()];
@@ -1072,7 +1098,7 @@
               nearestRectangle,
               corner,
               nearestCorner,
-              options
+              options,
             );
 
             interConstraints.push(constraint);
@@ -1101,7 +1127,7 @@
       parentNode,
       unconnectedCorners,
       nodeIDToRectangle,
-      options
+      options,
     ) {
       const parentRectangle = nodeIDToRectangle[parentNode.getID()];
 
@@ -1114,7 +1140,7 @@
           corner,
           [parentNode],
           angleRange.minAngle,
-          angleRange.maxAngle
+          angleRange.maxAngle,
         );
 
         const rectangle = nodeIDToRectangle[node.getID()];
@@ -1128,7 +1154,7 @@
             rectangle,
             nearestCorner,
             corner,
-            options
+            options,
           );
 
           fixedConstraints.push(constraint);
@@ -1141,10 +1167,11 @@
       corner,
       otherNodes,
       minAngle = 0,
-      maxAngle = 360
+      maxAngle = 360,
+      toleranceDistance = 0,
     ) {
-      let minDist = Infinity;
       let results = [];
+      let minDist = Infinity;
       otherNodes.forEach((otherNode) => {
         const boundingBox = otherNode.getBoundingBox();
         const otherCorners = GeometryUtil.getCornerPoints(boundingBox);
@@ -1152,33 +1179,34 @@
           const vectorAngle = GeometryUtil.angle(corner, otherCorner);
           const vectorAngleCCW = vectorAngle + 360;
           if (
-            !(vectorAngle >= minAngle && vectorAngle <= maxAngle) &&
-            !(vectorAngleCCW >= minAngle && vectorAngleCCW <= maxAngle)
-          )
+            !(vectorAngle >= minAngle && vectorAngle <= maxAngle)
+            && !(vectorAngleCCW >= minAngle && vectorAngleCCW <= maxAngle)
+            && GeometryUtil.distance(corner, otherCorner) > toleranceDistance
+          ) {
             return;
+          }
 
           const dist = GeometryUtil.distance(corner, otherCorner);
           if (dist <= minDist) {
-            if (dist < minDist) {
-              minDist = dist;
-              results = [];
-            }
+            results = [];
             results.push({
               nearestNode: otherNode,
               nearestCornerIndex: otherCornerIndex,
               nearestCorner: otherCorner,
             });
+            minDist = dist;
           }
         });
       });
+      // Either empty or 1 result
       return results;
     }
 
     static isCornerExcluded(node, cornerIndex, excludedCorners) {
       return excludedCorners.some((nodeAndCornerIndex) => {
         return (
-          node.getID() === nodeAndCornerIndex.node.getID() &&
-          cornerIndex === nodeAndCornerIndex.cornerIndex
+          node.getID() === nodeAndCornerIndex.node.getID()
+          && cornerIndex === nodeAndCornerIndex.cornerIndex
         );
       });
     }
@@ -1195,16 +1223,16 @@
     static calcApplyForcePosition(node, rectangle, options) {
       const randShiftRatioX = RandomUtil.randValue(
         options.minRandomShift,
-        options.maxRandomShift
+        options.maxRandomShift,
       );
       const randShiftRatioY = RandomUtil.randValue(
         options.minRandomShift,
-        options.maxRandomShift
+        options.maxRandomShift,
       );
       const boundingBox = node.getBoundingBox();
       const offset = Matter.Vector.create(
         boundingBox.width * randShiftRatioX,
-        boundingBox.height * randShiftRatioY
+        boundingBox.height * randShiftRatioY,
       );
       const center = rectangle.position;
       const offsetPosition = Matter.Vector.add(center, offset);
@@ -1219,7 +1247,7 @@
       // Randomly rotate the force
       const randAngleInDegree = RandomUtil.randValue(
         options.minRandomRotate,
-        options.maxRandomRotate
+        options.maxRandomRotate,
       );
       const randAngle = GeometryUtil.degreeToRadian(randAngleInDegree);
       const rotatedForce = Matter.Vector.rotate(correctedForce, randAngle);
@@ -1227,20 +1255,32 @@
       // Randomly scale the force
       const randScale = RandomUtil.randValue(
         options.minRandomScale,
-        options.maxRandomScale
+        options.maxRandomScale,
       );
       const scaledForce = Matter.Vector.mult(rotatedForce, randScale);
 
       return scaledForce;
+    }
+
+    static getTranslationBoundingBox() {
+      const documentWidth = $(document).width();
+      const documentHeight = $(document).height();
+      // Extend the document bounding box outward
+      return {
+        x: -1 * documentWidth,
+        y: -1 * documentHeight,
+        width: 3 * documentWidth,
+        height: 3 * documentHeight,
+      };
     }
   }
 
   class App {
     constructor() {
       // App constants
-      this.globalBookmarkletName = "JELLIFY_BOOKMARKLET";
-      this.globalOptionsName = "JELLIFY_OPTIONS";
-      this.globalDebugName = "JELLIFY_DEBUG";
+      this.globalBookmarkletName = 'JELLIFY_BOOKMARKLET';
+      this.globalOptionsName = 'JELLIFY_OPTIONS';
+      this.globalDebugName = 'JELLIFY_DEBUG';
       this.defaultOptions = {
         tree: {
           // We limit the minimal size to avoid building a very small rectangle
@@ -1263,8 +1303,15 @@
           maxVisualHeight: 5,
         },
         render: {
-          minFPS: 10,
+          minFPS: 30,
           maxFPS: 60,
+        },
+        geometry: {
+          // When two points are too close the angle calculation may not be
+          // reliable (for example, angle(p1, p2) = 180 when p1 and p2 are very
+          // close). Instead, we calculate the distance to see if we can treat
+          // two points the same
+          toleranceDistance: 1.0,
         },
         physics: {
           constraint: {
@@ -1305,7 +1352,7 @@
 
     init() {
       if (this.isLoaded()) {
-        console.info("Jellify is already loaded, not doing anything new");
+        console.info('Jellify is already loaded, not doing anything new');
         return;
       }
 
@@ -1327,7 +1374,7 @@
           this.treeManager,
           this.physicsManager,
           this.options,
-          isRender
+          isRender,
         );
 
         this.setLoaded();
@@ -1347,7 +1394,7 @@
     }
 
     readOptions() {
-      if (typeof window[this.globalOptionsName] === "undefined") {
+      if (typeof window[this.globalOptionsName] === 'undefined') {
         return this.defaultOptions;
       }
       const overrideOptions = window[this.globalOptionsName];
@@ -1356,19 +1403,19 @@
     }
 
     isLoaded() {
-      return typeof window[this.globalBookmarkletName] !== "undefined";
+      return typeof window[this.globalBookmarkletName] !== 'undefined';
     }
 
     isDebugMode() {
-      return typeof window[this.globalDebugName] !== "undefined";
+      return typeof window[this.globalDebugName] !== 'undefined';
     }
 
     setLoaded() {
       window[this.globalBookmarkletName] = true;
-      console.info("Jellify is loaded");
+      console.info('Jellify is loaded');
 
       if (this.isDebugMode()) {
-        console.info("Jellify debug mode is enabled");
+        console.info('Jellify debug mode is enabled');
       }
     }
 
