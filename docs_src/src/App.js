@@ -177,7 +177,7 @@ class App extends React.Component {
               <li>
                 Build a visual tree with larger rectangle as parent and
                 containing rectangles as its children on the hierarchical tree
-                with <code>getBoundingClientRect</code>
+                with the help of <code>getBoundingClientRect</code>
               </li>
               <li>
                 Build objects and constraints in Matter.js world (by finding
@@ -186,12 +186,12 @@ class App extends React.Component {
               <li>Measure the acceleration of the scroll bar values</li>
               <li>
                 Apply force on each outermost rectangles (I break down the
-                visual tree into smaller sub-tress, each of them is the root
-                node of the sub-tree)
+                visual tree into smaller sub-tress, each of the outermost
+                rectangle is the root node of the sub-tree)
               </li>
               <li>
                 Use CSS <code>transform</code> to sync the position and rotation
-                from Matter.js to the elements
+                from Matter.js world to the elements
               </li>
             </ol>
 
@@ -236,17 +236,10 @@ class App extends React.Component {
                 nor too high, otherwise it would appear as no effect or lag as
                 crazy as you can imagine
               </li>
-              <li>
-                It seems CSS <code>transform</code> doesn't work well on{" "}
-                <code>position: absolute</code> and <code>position: fixed</code>{" "}
-                elements
-              </li>
             </ul>
 
             <h2>Why You Should Apply It to Your Website</h2>
-            <p>
-              This bookmarklet can provide the following benefits:
-            </p>
+            <p>This bookmarklet can provide the following benefits:</p>
 
             <ul>
               <li>
@@ -284,8 +277,8 @@ class App extends React.Component {
 
             <h2>Special Thanks</h2>
             <p>
-              Thanks my SO for coming up the idea to arrange the gummy bears
-              and the image editing.
+              Thanks my SO for coming up the idea to arrange the gummy bears and
+              the image editing.
             </p>
           </section>
         </main>

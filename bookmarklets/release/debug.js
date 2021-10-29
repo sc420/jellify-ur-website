@@ -9,8 +9,8 @@
   window.JELLIFY_DEBUG = 1;
   window.JELLIFY_OPTIONS = {
     geometry: {
-      animationAreaZoom: Infinity,
-      translationAreaZoom: Infinity,
+      animationAreaZoom: 1000000,
+      translationAreaZoom: 1000000,
     },
   };
   const urls = [
