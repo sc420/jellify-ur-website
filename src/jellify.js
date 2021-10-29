@@ -50,6 +50,18 @@
       return Matter.Vector.sub(absPos, centerBox);
     }
 
+    static constrainPosInBoundingBox(pos, rect) {
+      const constrainedX = Math.min(
+        Math.max(pos.x, rect.x),
+        rect.x + rect.width,
+      );
+      const constrainedY = Math.min(
+        Math.max(pos.y, rect.y),
+        rect.y + rect.height,
+      );
+      return Matter.Vector.create(constrainedX, constrainedY);
+    }
+
     static distance(pos1, pos2) {
       const diff = Matter.Vector.sub(pos2, pos1);
       return Matter.Vector.magnitudeSquared(diff);
@@ -729,6 +741,9 @@
       this.smoothWindowAcceleration = new SmoothVector(
         this.options.physics.acceleration.smoothness,
       );
+
+      // Transform constraints
+      this.translationBoundingBox = JellifyEngine.getTranslationBoundingBox();
     }
 
     init() {
@@ -808,8 +823,16 @@
         TreeIterator.iterateVisualChildren(startingNode, (node) => {
           const rectangle = this.nodeIDToRectangle[node.getID()];
           const curPosition = rectangle.position;
+          // If we don't constrain the translation, the values may go wild
+          const constrainedPosition = GeometryUtil.constrainPosInBoundingBox(
+            curPosition,
+            this.translationBoundingBox,
+          );
           const origPosition = this.initialPositions[node.getID()];
-          const translation = Matter.Vector.sub(curPosition, origPosition);
+          const translation = Matter.Vector.sub(
+            constrainedPosition,
+            origPosition,
+          );
 
           node.setTransform(translation, rectangle.angle);
         });
@@ -1154,7 +1177,9 @@
           if (
             !(vectorAngle >= minAngle && vectorAngle <= maxAngle)
             && !(vectorAngleCCW >= minAngle && vectorAngleCCW <= maxAngle)
-          ) { return; }
+          ) {
+            return;
+          }
 
           const dist = GeometryUtil.distance(corner, otherCorner);
           if (dist <= minDist) {
@@ -1232,6 +1257,18 @@
 
       return scaledForce;
     }
+
+    static getTranslationBoundingBox() {
+      const documentWidth = $(document).width();
+      const documentHeight = $(document).height();
+      // Extend the document bounding box outward
+      return {
+        x: -1 * documentWidth,
+        y: -1 * documentHeight,
+        width: 3 * documentWidth,
+        height: 3 * documentHeight,
+      };
+    }
   }
 
   class App {
@@ -1262,7 +1299,7 @@
           maxVisualHeight: 5,
         },
         render: {
-          minFPS: 10,
+          minFPS: 30,
           maxFPS: 60,
         },
         physics: {
