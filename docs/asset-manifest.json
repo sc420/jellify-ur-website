@@ -1,0 +1,19 @@
+{
+  "files": {
+    "main.js": "/jellify-ur-website/static/js/main.63b8e79b.chunk.js",
+    "main.js.map": "/jellify-ur-website/static/js/main.63b8e79b.chunk.js.map",
+    "runtime-main.js": "/jellify-ur-website/static/js/runtime-main.4657f654.js",
+    "runtime-main.js.map": "/jellify-ur-website/static/js/runtime-main.4657f654.js.map",
+    "static/js/2.8cf1b53b.chunk.js": "/jellify-ur-website/static/js/2.8cf1b53b.chunk.js",
+    "static/js/2.8cf1b53b.chunk.js.map": "/jellify-ur-website/static/js/2.8cf1b53b.chunk.js.map",
+    "static/js/3.534ece83.chunk.js": "/jellify-ur-website/static/js/3.534ece83.chunk.js",
+    "static/js/3.534ece83.chunk.js.map": "/jellify-ur-website/static/js/3.534ece83.chunk.js.map",
+    "index.html": "/jellify-ur-website/index.html",
+    "static/js/2.8cf1b53b.chunk.js.LICENSE.txt": "/jellify-ur-website/static/js/2.8cf1b53b.chunk.js.LICENSE.txt"
+  },
+  "entrypoints": [
+    "static/js/runtime-main.4657f654.js",
+    "static/js/2.8cf1b53b.chunk.js",
+    "static/js/main.63b8e79b.chunk.js"
+  ]
+}

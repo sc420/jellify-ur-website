@@ -1,5 +1,5 @@
 {
-  "name": "docs",
+  "name": "docs_src",
   "version": "0.1.0",
   "private": true,
   "dependencies": {
