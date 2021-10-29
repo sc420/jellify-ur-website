@@ -18,7 +18,7 @@
     'https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js',
     'https://cdn.jsdelivr.net/npm/matter-js@0.17.1/build/matter.min.js',
     // Main script is loaded last
-    'https://sc420.github.io/jellify-ur-website/jellify.js',
+    'https://sc420.github.io/jellify-ur-website/js/jellify.js',
   ];
   urls.forEach((url) => {
     const head = document.getElementsByTagName('head')[0];

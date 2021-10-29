@@ -6,6 +6,7 @@
 // 3. Add "javascript:" in front of the minified code to create a bookmarklet
 
 (() => {
+  window.JELLIFY_DEBUG = 1;
   const urls = [
     // Dependencies should be loaded first
     'https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js',
