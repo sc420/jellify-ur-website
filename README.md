@@ -2,11 +2,13 @@
 
 A bookmarklet that turns any website into a big yummy wobbly jelly.
 
-Inspired by [r/badUIbattles](https://www.reddit.com/r/baduibattles).
+Inspired by [r/badUIbattles](https://www.reddit.com/r/badUIbattles/).
+
+![screenshot](./screenshots/screenshot.gif "Jellify Screenshot")
 
 ## Demo
 
-See [online demo](https://sc420.github.io/jellify-ur-website/) as well as how it works.
+Check this [online demo](https://sc420.github.io/jellify-ur-website/) as well as see how it works.
 
 ## Development
 
