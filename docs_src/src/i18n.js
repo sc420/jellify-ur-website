@@ -16,15 +16,20 @@ i18n
   // init i18next
   // for all options read: https://www.i18next.com/overview/configuration-options
   .init({
-    debug: false,
-    // Fallback languages in order
-    // Reference: https://www.i18next.com/principles/fallback#fallback-to-different-languages
-    fallbackLng: ['zh-TW', 'en'],
+    backend: {
+      // Reference: https://github.com/i18next/i18next-http-backend
+      loadPath: `${process.env.PUBLIC_URL}/locales/{{lng}}/{{ns}}.json`,
+    },
+    debug: process.env.NODE_ENV === "development",
+    // Reference: https://www.i18next.com/overview/configuration-options
+    fallbackLng: ["zh-TW", "en"],
     interpolation: {
       escapeValue: false, // not needed for react as it escapes by default
     },
+    load: "currentOnly",
     // Reference: https://www.i18next.com/principles/namespaces
-    ns: ['App', 'Navbar'],
+    ns: ["App", "Navbar"],
+    supportedLngs: ["zh-TW", "en"],
   });
 
 export default i18n;
