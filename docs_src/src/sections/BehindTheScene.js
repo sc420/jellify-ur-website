@@ -139,7 +139,7 @@ function BehindTheScene(props) {
 
   if (i18n.language === "en") return BehindTheSceneEN(props);
   else if (i18n.language === "zh-TW") return BehindTheSceneTW(props);
-  else throw new Error("Unknown i18n language");
+  else throw new Error(`Unknown i18n language "${i18n.language}"`);
 }
 
 export default BehindTheScene;

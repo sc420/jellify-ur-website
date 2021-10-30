@@ -86,7 +86,7 @@ function WhyYouShouldUseIt() {
 
   if (i18n.language === "en") return WhyYouShouldUseItEN();
   else if (i18n.language === "zh-TW") return WhyYouShouldUseItTW();
-  else throw new Error("Unknown i18n language");
+  else throw new Error(`Unknown i18n language "${i18n.language}"`);
 }
 
 export default WhyYouShouldUseIt;

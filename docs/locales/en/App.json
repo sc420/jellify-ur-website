@@ -1,0 +1,9 @@
+{
+  "title": "Jellify",
+  "jellifyButtonText": {
+    "notJellified": "Click the Button to Jellify This Page",
+    "jellified": "Jellified! Try Scrolling Down"
+  },
+  "jellifyButton": "Jellify",
+  "jellifyButtonHint": "Drag this button to your bookmarks bar to jellify other pages too!"
+}

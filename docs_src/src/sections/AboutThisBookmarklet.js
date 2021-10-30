@@ -59,7 +59,7 @@ function AboutThisBookmarklet() {
 
   if (i18n.language === "en") return AboutThisBookmarkletEN();
   else if (i18n.language === "zh-TW") return AboutThisBookmarkletTW();
-  else throw new Error("Unknown i18n language");
+  else throw new Error(`Unknown i18n language "${i18n.language}"`);
 }
 
 export default AboutThisBookmarklet;
