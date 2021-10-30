@@ -44,9 +44,11 @@ function FooterTW() {
 function Footer() {
   const { i18n } = useTranslation();
 
-  if (i18n.language === "en") return FooterEN();
-  else if (i18n.language === "zh-TW") return FooterTW();
-  else throw new Error(`Unknown i18n language "${i18n.language}"`);
+  const lng = i18n.language || "en";
+
+  if (lng === "en") return FooterEN();
+  else if (lng === "zh-TW") return FooterTW();
+  else throw new Error(`Unknown i18n language "${lng}"`);
 }
 
 export default Footer;
