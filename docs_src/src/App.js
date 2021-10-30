@@ -1,6 +1,7 @@
 import React from "react";
 
 import TextTransition, { presets } from "react-text-transition";
+import { ChevronDoubleDown } from 'react-bootstrap-icons';
 
 import BookmarkletLink from "./BookmarkletLink";
 import GummyBearSection from "./GummyBearSection";
@@ -69,7 +70,7 @@ class App extends React.Component {
                     direction="up"
                   />
                 </div>
-                <i className="bi bi-chevron-double-down"></i>
+                <ChevronDoubleDown />
               </div>
               <BookmarkletLink
                 buttonClassName={this.getJellifyButtonClassName()}
