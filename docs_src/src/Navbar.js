@@ -1,12 +1,17 @@
 import { Nav } from "react-bootstrap";
+import { useTranslation } from 'react-i18next';
 
 function Navbar() {
+  const { t, i18n } = useTranslation('Navbar');
+
+  const changeLanguage = (lng) => {
+    i18n.changeLanguage(lng);
+  };
+
   return (
     <nav className="navbar navbar-expand-lg navbar-light bg-light sticky-top">
       <div className="container">
-        <a className="navbar-brand" href="#/">
-          Jellify Bookmarklet
-        </a>
+        <a className="navbar-brand" href="#/">{t('title')}</a>
         <button
           className="navbar-toggler"
           type="button"
@@ -38,15 +43,15 @@ function Navbar() {
 
           <Nav
             className="ms-auto my-2 my-lg-0"
-            defaultActiveKey="lang-en"
-            onSelect={(selectedKey) => alert(`selected ${selectedKey}`)}
+            defaultActiveKey={i18n.language}
+            onSelect={changeLanguage}
             variant="pills"
           >
             <Nav.Item>
-              <Nav.Link eventKey="lang-en">English</Nav.Link>
+              <Nav.Link eventKey="en">English</Nav.Link>
             </Nav.Item>
             <Nav.Item>
-              <Nav.Link eventKey="lang-tw">繁體中文</Nav.Link>
+              <Nav.Link eventKey="zh-TW">繁體中文</Nav.Link>
             </Nav.Item>
           </Nav>
         </div>

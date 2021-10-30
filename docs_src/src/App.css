@@ -1,0 +1,9 @@
+@font-face {
+  font-family: "TaipeiSansTCBeta-Regular";
+  src: local("TaipeiSansTCBeta-Regular"),
+    url("./fonts/TaipeiSansTCBeta-Regular.ttf") format("truetype");
+}
+
+.App[lng="zh-TW"] {
+  font-family: "TaipeiSansTCBeta-Regular", sans-serif;
+}

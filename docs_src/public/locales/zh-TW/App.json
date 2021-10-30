@@ -1,0 +1,9 @@
+{
+  "title": "Jellify",
+  "jellifyButtonText": {
+    "notJellified": "請點這個按鈕",
+    "jellified": "這個網頁已經被果凍化了，往下捲動看看"
+  },
+  "jellifyButton": "果凍化",
+  "jellifyButtonHint": "可以拖曳這個按鈕到書籤列，把其他網頁也果凍化!"
+}
