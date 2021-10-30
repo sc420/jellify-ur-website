@@ -34,7 +34,7 @@ function WhyYouShouldUseItEN() {
         </code>
       </pre>
       <pre>
-        <code>https://sc420.github.io/jellify-ur-website/jellify.js</code>
+        <code>https://sc420.github.io/jellify-ur-website/js/jellify.js</code>
       </pre>
 
       <p className="fw-bold">Just kidding lol</p>
@@ -73,7 +73,7 @@ function WhyYouShouldUseItTW() {
         </code>
       </pre>
       <pre>
-        <code>https://sc420.github.io/jellify-ur-website/jellify.js</code>
+        <code>https://sc420.github.io/jellify-ur-website/js/jellify.js</code>
       </pre>
 
       <p className="fw-bold">開玩笑的 XD</p>
