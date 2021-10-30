@@ -36,7 +36,7 @@ class App extends React.Component {
 
   render() {
     return (
-      <div>
+      <>
         <Navbar />
 
         <main className="container">
@@ -283,7 +283,7 @@ class App extends React.Component {
             </p>
           </section>
         </main>
-      </div>
+      </>
     );
   }
 }
