@@ -24,7 +24,7 @@ function FooterEN() {
 
 function FooterTW() {
   return (
-    <footer className="text-muted py-3">
+    <footer className="text-muted py-4">
       <div className="container">
         <p className="my-1">
           本網頁運用 <a href="https://reactjs.org/">React</a> +{" "}

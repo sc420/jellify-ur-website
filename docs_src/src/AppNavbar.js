@@ -12,7 +12,13 @@ function AppNavbar() {
 
   return (
     <header className="py-1">
-      <Navbar className="border-bottom" collapseOnSelect expand="lg" bg="light" fixed="top" variant="light">
+      <Navbar
+        bg="light"
+        className="border-bottom"
+        collapseOnSelect
+        expand="lg"
+        fixed="top"
+      >
         <Container>
           <Navbar.Brand href="#/">{t("title")}</Navbar.Brand>
           <Navbar.Toggle aria-controls="responsive-navbar-nav" />
@@ -33,15 +39,12 @@ function AppNavbar() {
             </Nav>
             <Nav
               defaultActiveKey={i18n.language}
+              className="my-nav-pills"
               onSelect={changeLanguage}
               variant="pills"
             >
-              <Nav.Item>
-                <Nav.Link eventKey="en">English</Nav.Link>
-              </Nav.Item>
-              <Nav.Item>
-                <Nav.Link eventKey="zh-TW">繁體中文</Nav.Link>
-              </Nav.Item>
+              <Nav.Link eventKey="en">English</Nav.Link>
+              <Nav.Link eventKey="zh-TW">繁體中文</Nav.Link>
             </Nav>
           </Navbar.Collapse>
         </Container>

@@ -5,3 +5,8 @@
 #github-link:hover path {
   fill: rgba(0, 0, 0, 0.7);
 }
+
+/* Fix wrong color caused by ".navbar-light .navbar-nav .nav-link.active" */
+.nav-pills > .nav-link.active {
+  color: white !important;
+}
