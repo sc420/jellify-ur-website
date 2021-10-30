@@ -1,8 +1,8 @@
 import { Nav } from "react-bootstrap";
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from "react-i18next";
 
 function Navbar() {
-  const { t, i18n } = useTranslation('Navbar');
+  const { t, i18n } = useTranslation("Navbar");
 
   const changeLanguage = (lng) => {
     i18n.changeLanguage(lng);
@@ -11,7 +11,9 @@ function Navbar() {
   return (
     <nav className="navbar navbar-expand-lg navbar-light bg-light sticky-top">
       <div className="container">
-        <a className="navbar-brand" href="#/">{t('title')}</a>
+        <a className="navbar-brand" href="#/">
+          {t("title")}
+        </a>
         <button
           className="navbar-toggler"
           type="button"
@@ -35,7 +37,10 @@ function Navbar() {
               </a>
             </li>
             <li className="nav-item">
-              <a className="nav-link" href="https://shawnchang420.blogspot.com/">
+              <a
+                className="nav-link"
+                href="https://shawnchang420.blogspot.com/"
+              >
                 Blog
               </a>
             </li>
