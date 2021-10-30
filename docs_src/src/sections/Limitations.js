@@ -23,6 +23,12 @@ function LimitationsEN() {
           you can imagine (although I did some optimization)
         </li>
       </ul>
+
+      <p>
+        Feel choppy? You may try enabling hardware acceleration or switching
+        another browser. I have noticed both Firefox and Edge run slightly
+        faster than Chrome.
+      </p>
     </>
   );
 }
@@ -49,6 +55,11 @@ function LimitationsTW() {
           到很可怕 (雖然後面有做優化)
         </li>
       </ul>
+
+      <p>
+        感覺很卡嗎? 你可以試試開啟硬體加速看有沒有好一點。我也有觀察到 Firefox
+        和 Edge 跑的比 Chrome 快一點點
+      </p>
     </>
   );
 }
