@@ -6,17 +6,18 @@ import { withTranslation } from "react-i18next";
 
 import AboutThisBookmarklet from "./sections/AboutThisBookmarklet";
 import AppLoader from "./AppLoader";
+import AppNavbar from "./AppNavbar";
 import BehindTheScene from "./sections/BehindTheScene";
 import BookmarkletLink from "./BookmarkletLink";
+import Footer from "./Footer";
 import GummyBearSection from "./GummyBearSection";
-import Navbar from "./Navbar";
+import Limitations from "./sections/Limitations";
 import OtherSoftness from "./sections/OtherSoftness";
+import SpecialThanks from "./sections/SpecialThanks";
 import SupportedBrowsers from "./sections/SupportedBrowsers";
+import WhyYouShouldUseIt from "./sections/WhyYouShouldUseIt";
 
 import "./App.css";
-import Limitations from "./sections/Limitations";
-import WhyYouShouldUseIt from "./sections/WhyYouShouldUseIt";
-import SpecialThanks from "./sections/SpecialThanks";
 
 class App extends Component {
   constructor(props) {
@@ -50,7 +51,7 @@ class App extends Component {
     const { t, i18n } = this.props;
     return (
       <div className="App" lng={i18n.language}>
-        <Navbar />
+        <AppNavbar />
 
         <main className="container">
           <div className="p-3 bg-light rounded-3">
@@ -123,6 +124,8 @@ class App extends Component {
             <SpecialThanks />
           </section>
         </main>
+
+        <Footer />
       </div>
     );
   }

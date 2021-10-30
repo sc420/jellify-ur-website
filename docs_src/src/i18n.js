@@ -28,7 +28,7 @@ i18n
     },
     load: "currentOnly",
     // Reference: https://www.i18next.com/principles/namespaces
-    ns: ["App", "Navbar"],
+    ns: ["App", "AppNavbar"],
     supportedLngs: ["zh-TW", "en"],
   });
 

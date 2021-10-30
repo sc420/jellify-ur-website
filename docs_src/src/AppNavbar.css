@@ -1,0 +1,7 @@
+#github-link path {
+  fill: rgba(0, 0, 0, 0.55);
+}
+
+#github-link:hover path {
+  fill: rgba(0, 0, 0, 0.7);
+}
