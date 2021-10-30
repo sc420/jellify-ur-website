@@ -4,7 +4,7 @@ import "./Footer.css";
 
 function FooterEN() {
   return (
-    <footer className="text-muted py-3">
+    <footer className="text-muted py-4">
       <div className="container">
         <p className="my-1">
           This website is built by <a href="https://reactjs.org/">React</a> +{" "}

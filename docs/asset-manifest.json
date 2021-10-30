@@ -1,24 +1,24 @@
 {
   "files": {
-    "main.css": "/jellify-ur-website/static/css/main.90775378.chunk.css",
-    "main.js": "/jellify-ur-website/static/js/main.762ded5e.chunk.js",
-    "main.js.map": "/jellify-ur-website/static/js/main.762ded5e.chunk.js.map",
-    "runtime-main.js": "/jellify-ur-website/static/js/runtime-main.0a8c2a5e.js",
-    "runtime-main.js.map": "/jellify-ur-website/static/js/runtime-main.0a8c2a5e.js.map",
-    "static/js/2.11aae824.chunk.js": "/jellify-ur-website/static/js/2.11aae824.chunk.js",
-    "static/js/2.11aae824.chunk.js.map": "/jellify-ur-website/static/js/2.11aae824.chunk.js.map",
-    "static/js/3.4346a156.chunk.js": "/jellify-ur-website/static/js/3.4346a156.chunk.js",
-    "static/js/3.4346a156.chunk.js.map": "/jellify-ur-website/static/js/3.4346a156.chunk.js.map",
+    "main.css": "/jellify-ur-website/static/css/main.275f8185.chunk.css",
+    "main.js": "/jellify-ur-website/static/js/main.435adacc.chunk.js",
+    "main.js.map": "/jellify-ur-website/static/js/main.435adacc.chunk.js.map",
+    "runtime-main.js": "/jellify-ur-website/static/js/runtime-main.25b267ff.js",
+    "runtime-main.js.map": "/jellify-ur-website/static/js/runtime-main.25b267ff.js.map",
+    "static/js/2.ef92cc86.chunk.js": "/jellify-ur-website/static/js/2.ef92cc86.chunk.js",
+    "static/js/2.ef92cc86.chunk.js.map": "/jellify-ur-website/static/js/2.ef92cc86.chunk.js.map",
+    "static/js/3.62b2399b.chunk.js": "/jellify-ur-website/static/js/3.62b2399b.chunk.js",
+    "static/js/3.62b2399b.chunk.js.map": "/jellify-ur-website/static/js/3.62b2399b.chunk.js.map",
     "index.html": "/jellify-ur-website/index.html",
-    "static/css/main.90775378.chunk.css.map": "/jellify-ur-website/static/css/main.90775378.chunk.css.map",
-    "static/js/2.11aae824.chunk.js.LICENSE.txt": "/jellify-ur-website/static/js/2.11aae824.chunk.js.LICENSE.txt",
+    "static/css/main.275f8185.chunk.css.map": "/jellify-ur-website/static/css/main.275f8185.chunk.css.map",
+    "static/js/2.ef92cc86.chunk.js.LICENSE.txt": "/jellify-ur-website/static/js/2.ef92cc86.chunk.js.LICENSE.txt",
     "static/media/App.css": "/jellify-ur-website/static/media/TaipeiSansTCBeta-Regular.3c32e328.ttf",
     "static/media/getFetch.cjs": "/jellify-ur-website/static/media/getFetch.582d29c4.cjs"
   },
   "entrypoints": [
-    "static/js/runtime-main.0a8c2a5e.js",
-    "static/js/2.11aae824.chunk.js",
-    "static/css/main.90775378.chunk.css",
-    "static/js/main.762ded5e.chunk.js"
+    "static/js/runtime-main.25b267ff.js",
+    "static/js/2.ef92cc86.chunk.js",
+    "static/css/main.275f8185.chunk.css",
+    "static/js/main.435adacc.chunk.js"
   ]
 }
