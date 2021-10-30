@@ -12,6 +12,11 @@ This directory contains React.js source for building website into `docs/`.
 2. Run `npm run build`
 3. Copy files from `build/*` to `docs/`
 
+### Testing Deployed Files
+
+1. Copy files from `build/*` to `jellify-ur-website/*`
+2. Start a live server from `jellify-ur-website/`
+
 ## UI References
 
 - [Bootstrap 5 Examples](https://getbootstrap.com/docs/5.0/examples/)
