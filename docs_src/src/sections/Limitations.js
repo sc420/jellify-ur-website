@@ -30,7 +30,7 @@ function LimitationsEN() {
 function LimitationsTW() {
   return (
     <>
-      <h2>限制</h2>
+      <h2>一些小限制</h2>
       <p>
         既然我們後面藏了一個物理引擎，還用了 CSS <code>transform</code>
         ，勢必會有一些限制:

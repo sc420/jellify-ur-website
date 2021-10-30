@@ -1,8 +1,9 @@
 import React, { Component, Suspense } from "react";
 
-import { ChevronDoubleDown } from "react-bootstrap-icons";
-import TextTransition, { presets } from "react-text-transition";
+import { ArrowUpCircleFill, ChevronDoubleDown } from "react-bootstrap-icons";
 import { withTranslation } from "react-i18next";
+import ScrollTop from "react-scrolltop-button";
+import TextTransition, { presets } from "react-text-transition";
 
 import AboutThisBookmarklet from "./sections/AboutThisBookmarklet";
 import AppLoader from "./AppLoader";
@@ -53,7 +54,7 @@ class App extends Component {
       <div className="App" lng={i18n.language}>
         <AppNavbar />
 
-        <main className="container">
+        <main className="container mt-5">
           <div className="p-3 bg-light rounded-3">
             <div className="container p-3">
               <h1 className="display-3 fw-bold text-center">
@@ -126,6 +127,17 @@ class App extends Component {
         </main>
 
         <Footer />
+
+        <ScrollTop
+          breakpoint={Infinity}
+          className="scroll-top-button"
+          icon={
+            <div>
+              <ArrowUpCircleFill className="fs-1" />
+            </div>
+          }
+          speed={100}
+        />
       </div>
     );
   }

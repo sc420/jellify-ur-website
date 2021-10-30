@@ -7,3 +7,15 @@
 .App[lng="zh-TW"] {
   font-family: "TaipeiSansTCBeta-Regular", sans-serif;
 }
+
+/* Override the library default */
+.scroll-top-button {
+  color: gray !important;
+  background: transparent !important;
+  border: 0 !important;
+}
+
+/* Override the library default */
+.scroll-top-button:hover {
+  color: black !important;
+}

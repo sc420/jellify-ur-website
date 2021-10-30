@@ -27,15 +27,15 @@ function FooterTW() {
     <footer className="text-muted py-3">
       <div className="container">
         <p className="my-1">
-          這個網頁是用 <a href="https://reactjs.org/">React</a> +{" "}
-          <a href="https://code.visualstudio.com/">VS Code</a> 做的
+          本網頁運用 <a href="https://reactjs.org/">React</a> +{" "}
+          <a href="https://code.visualstudio.com/">VS Code</a> 來實作
         </p>
         <p className="my-1">
-          網頁的程式碼在{" "}
+          網頁的程式碼可以在{" "}
           <a href="https://github.com/sc420/jellify-ur-website/tree/main/docs_src">
             GitHub
           </a>{" "}
-          上
+          上看
         </p>
       </div>
     </footer>

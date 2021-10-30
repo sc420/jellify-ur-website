@@ -11,10 +11,10 @@ function AppNavbar() {
   };
 
   return (
-    <header className="py-1 border-bottom">
-      <Navbar collapseOnSelect expand="lg" bg="light" variant="light">
+    <header className="py-1">
+      <Navbar className="border-bottom" collapseOnSelect expand="lg" bg="light" fixed="top" variant="light">
         <Container>
-          <Navbar.Brand href="#home">{t("title")}</Navbar.Brand>
+          <Navbar.Brand href="#/">{t("title")}</Navbar.Brand>
           <Navbar.Toggle aria-controls="responsive-navbar-nav" />
           <Navbar.Collapse id="responsive-navbar-nav">
             <Nav className="me-auto">
