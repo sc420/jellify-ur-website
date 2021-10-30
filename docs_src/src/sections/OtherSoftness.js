@@ -74,9 +74,11 @@ function OtherSoftnessTW(props) {
 function OtherSoftness(props) {
   const { i18n } = useTranslation();
 
-  if (i18n.language === "en") return OtherSoftnessEN(props);
-  else if (i18n.language === "zh-TW") return OtherSoftnessTW(props);
-  else throw new Error(`Unknown i18n language "${i18n.language}"`);
+  const lng = i18n.language || "en";
+
+  if (lng === "en") return OtherSoftnessEN(props);
+  else if (lng === "zh-TW") return OtherSoftnessTW(props);
+  else throw new Error(`Unknown i18n language "${lng}"`);
 }
 
 export default OtherSoftness;

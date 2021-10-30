@@ -67,9 +67,11 @@ function LimitationsTW() {
 function Limitations() {
   const { i18n } = useTranslation();
 
-  if (i18n.language === "en") return LimitationsEN();
-  else if (i18n.language === "zh-TW") return LimitationsTW();
-  else throw new Error(`Unknown i18n language "${i18n.language}"`);
+  const lng = i18n.language || "en";
+
+  if (lng === "en") return LimitationsEN();
+  else if (lng === "zh-TW") return LimitationsTW();
+  else throw new Error(`Unknown i18n language "${lng}"`);
 }
 
 export default Limitations;

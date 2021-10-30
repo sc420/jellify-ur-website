@@ -124,11 +124,10 @@ function BehindTheSceneTW(props) {
 
       <p>
         你會看到 elements 外面被畫了紅藍色的線、還有捲到網頁最下面可以看到
-        Matter.js 畫出來的 canvas。
-        紅框的 element 代表 visual sub-tree 的 root node；
-        藍框的 element 代表 visual sub-tree 底下的 nodes。
-        你甚至還可以拖曳看看 Matter.js canvas 裡面的長方形，上面對應到的 elements
-        也會跟著動。
+        Matter.js 畫出來的 canvas。 紅框的 element 代表 visual sub-tree 的 root
+        node； 藍框的 element 代表 visual sub-tree 底下的 nodes。
+        你甚至還可以拖曳看看 Matter.js canvas 裡面的長方形，上面對應到的
+        elements 也會跟著動。
       </p>
     </>
   );
@@ -137,9 +136,11 @@ function BehindTheSceneTW(props) {
 function BehindTheScene(props) {
   const { i18n } = useTranslation();
 
-  if (i18n.language === "en") return BehindTheSceneEN(props);
-  else if (i18n.language === "zh-TW") return BehindTheSceneTW(props);
-  else throw new Error(`Unknown i18n language "${i18n.language}"`);
+  const lng = i18n.language || "en";
+
+  if (lng === "en") return BehindTheSceneEN(props);
+  else if (lng === "zh-TW") return BehindTheSceneTW(props);
+  else throw new Error(`Unknown i18n language "${lng}"`);
 }
 
 export default BehindTheScene;

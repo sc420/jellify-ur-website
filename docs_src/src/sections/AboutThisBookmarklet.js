@@ -47,8 +47,8 @@ function AboutThisBookmarkletTW() {
       </p>
 
       <p>
-        程式碼可以到 <a href="https://github.com/sc420/jellify-ur-website">GitHub</a>{" "}
-        上看
+        程式碼可以到{" "}
+        <a href="https://github.com/sc420/jellify-ur-website">GitHub</a> 上看
       </p>
     </>
   );
@@ -57,9 +57,11 @@ function AboutThisBookmarkletTW() {
 function AboutThisBookmarklet() {
   const { i18n } = useTranslation();
 
-  if (i18n.language === "en") return AboutThisBookmarkletEN();
-  else if (i18n.language === "zh-TW") return AboutThisBookmarkletTW();
-  else throw new Error(`Unknown i18n language "${i18n.language}"`);
+  const lng = i18n.language || "en";
+
+  if (lng === "en") return AboutThisBookmarkletEN();
+  else if (lng === "zh-TW") return AboutThisBookmarkletTW();
+  else throw new Error(`Unknown i18n language "${lng}"`);
 }
 
 export default AboutThisBookmarklet;

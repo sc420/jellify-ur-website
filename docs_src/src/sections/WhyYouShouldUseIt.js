@@ -84,9 +84,11 @@ function WhyYouShouldUseItTW() {
 function WhyYouShouldUseIt() {
   const { i18n } = useTranslation();
 
-  if (i18n.language === "en") return WhyYouShouldUseItEN();
-  else if (i18n.language === "zh-TW") return WhyYouShouldUseItTW();
-  else throw new Error(`Unknown i18n language "${i18n.language}"`);
+  const lng = i18n.language || "en";
+
+  if (lng === "en") return WhyYouShouldUseItEN();
+  else if (lng === "zh-TW") return WhyYouShouldUseItTW();
+  else throw new Error(`Unknown i18n language "${lng}"`);
 }
 
 export default WhyYouShouldUseIt;

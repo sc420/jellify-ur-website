@@ -28,9 +28,7 @@ function SupportedBrowsersTW() {
         <li>Edge</li>
       </ul>
 
-      <p>
-        因為程式碼幾乎都是用 ES6 寫的，所以如果用不了可能要更新瀏覽器
-      </p>
+      <p>因為程式碼幾乎都是用 ES6 寫的，所以如果用不了可能要更新瀏覽器</p>
     </>
   );
 }
@@ -38,9 +36,11 @@ function SupportedBrowsersTW() {
 function SupportedBrowsers() {
   const { i18n } = useTranslation();
 
-  if (i18n.language === "en") return SupportedBrowsersEN();
-  else if (i18n.language === "zh-TW") return SupportedBrowsersTW();
-  else throw new Error(`Unknown i18n language "${i18n.language}"`);
+  const lng = i18n.language || "en";
+
+  if (lng === "en") return SupportedBrowsersEN();
+  else if (lng === "zh-TW") return SupportedBrowsersTW();
+  else throw new Error(`Unknown i18n language "${lng}"`);
 }
 
 export default SupportedBrowsers;
