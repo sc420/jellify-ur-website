@@ -26,10 +26,9 @@ function GummyBearSection(props) {
   const columns = colors.map((color, index) => (
     <div className={`col-2 offset-${calcOffset(index)}`} key={index}>
       <img
-        className="m-3"
+        className="img-fluid m-3"
         src={`${process.env.PUBLIC_URL}/img/gummy-bear-${color}.png`}
         alt="gummy-bear"
-        height="200px"
       />
     </div>
   ));

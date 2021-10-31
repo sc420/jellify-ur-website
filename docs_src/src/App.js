@@ -58,20 +58,23 @@ class App extends Component {
           <div className="p-3 bg-light rounded-3">
             <div className="container p-3">
               <h1 className="display-3 fw-bold text-center">
-                <div className="d-flex align-items-center justify-content-center">
+                <div
+                  id="title-container"
+                  className="d-flex align-items-center justify-content-center"
+                >
                   <div className="p-3">
                     <img
+                      className="img-fluid"
                       src={`${process.env.PUBLIC_URL}/img/gummy-bear-yellow.png`}
                       alt="gummy-bear"
-                      height="200px"
                     />
                   </div>
                   <div className="p-3">{t("title")}</div>
                   <div className="p-3">
                     <img
+                      className="img-fluid"
                       src={`${process.env.PUBLIC_URL}/img/gummy-bear-yellow.png`}
                       alt="gummy-bear"
-                      height="200px"
                     />
                   </div>
                 </div>

@@ -8,6 +8,10 @@
   font-family: "TaipeiSansTCBeta-Regular", sans-serif;
 }
 
+#title-container img {
+  max-height: 250px;
+}
+
 /* Override the library default */
 .scroll-top-button {
   color: gray !important;
@@ -18,4 +22,10 @@
 /* Override the library default */
 .scroll-top-button:hover {
   color: black !important;
+}
+
+@media screen and (max-width: 768px) {
+  .App {
+    min-width: 320px;
+  }
 }
