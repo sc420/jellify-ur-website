@@ -1,8 +1,8 @@
 {
   "files": {
-    "main.css": "/jellify-ur-website/static/css/main.275f8185.chunk.css",
-    "main.js": "/jellify-ur-website/static/js/main.e904e510.chunk.js",
-    "main.js.map": "/jellify-ur-website/static/js/main.e904e510.chunk.js.map",
+    "main.css": "/jellify-ur-website/static/css/main.5656f373.chunk.css",
+    "main.js": "/jellify-ur-website/static/js/main.2a5e0f58.chunk.js",
+    "main.js.map": "/jellify-ur-website/static/js/main.2a5e0f58.chunk.js.map",
     "runtime-main.js": "/jellify-ur-website/static/js/runtime-main.25b267ff.js",
     "runtime-main.js.map": "/jellify-ur-website/static/js/runtime-main.25b267ff.js.map",
     "static/js/2.ef92cc86.chunk.js": "/jellify-ur-website/static/js/2.ef92cc86.chunk.js",
@@ -10,7 +10,7 @@
     "static/js/3.62b2399b.chunk.js": "/jellify-ur-website/static/js/3.62b2399b.chunk.js",
     "static/js/3.62b2399b.chunk.js.map": "/jellify-ur-website/static/js/3.62b2399b.chunk.js.map",
     "index.html": "/jellify-ur-website/index.html",
-    "static/css/main.275f8185.chunk.css.map": "/jellify-ur-website/static/css/main.275f8185.chunk.css.map",
+    "static/css/main.5656f373.chunk.css.map": "/jellify-ur-website/static/css/main.5656f373.chunk.css.map",
     "static/js/2.ef92cc86.chunk.js.LICENSE.txt": "/jellify-ur-website/static/js/2.ef92cc86.chunk.js.LICENSE.txt",
     "static/media/App.css": "/jellify-ur-website/static/media/TaipeiSansTCBeta-Regular.3c32e328.ttf",
     "static/media/getFetch.cjs": "/jellify-ur-website/static/media/getFetch.582d29c4.cjs"
@@ -18,7 +18,7 @@
   "entrypoints": [
     "static/js/runtime-main.25b267ff.js",
     "static/js/2.ef92cc86.chunk.js",
-    "static/css/main.275f8185.chunk.css",
-    "static/js/main.e904e510.chunk.js"
+    "static/css/main.5656f373.chunk.css",
+    "static/js/main.2a5e0f58.chunk.js"
   ]
 }
