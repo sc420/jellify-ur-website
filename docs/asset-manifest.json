@@ -1,8 +1,8 @@
 {
   "files": {
     "main.css": "/jellify-ur-website/static/css/main.5656f373.chunk.css",
-    "main.js": "/jellify-ur-website/static/js/main.2a5e0f58.chunk.js",
-    "main.js.map": "/jellify-ur-website/static/js/main.2a5e0f58.chunk.js.map",
+    "main.js": "/jellify-ur-website/static/js/main.bac50f91.chunk.js",
+    "main.js.map": "/jellify-ur-website/static/js/main.bac50f91.chunk.js.map",
     "runtime-main.js": "/jellify-ur-website/static/js/runtime-main.25b267ff.js",
     "runtime-main.js.map": "/jellify-ur-website/static/js/runtime-main.25b267ff.js.map",
     "static/js/2.ef92cc86.chunk.js": "/jellify-ur-website/static/js/2.ef92cc86.chunk.js",
@@ -19,6 +19,6 @@
     "static/js/runtime-main.25b267ff.js",
     "static/js/2.ef92cc86.chunk.js",
     "static/css/main.5656f373.chunk.css",
-    "static/js/main.2a5e0f58.chunk.js"
+    "static/js/main.bac50f91.chunk.js"
   ]
 }
