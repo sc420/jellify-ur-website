@@ -36,7 +36,7 @@ function AboutThisBookmarkletTW() {
         這是我做的一個 Side Project，單純為了好玩。我是逛了 reddit 看板{" "}
         <a href="https://www.reddit.com/r/badUIbattles/">r/badUIbattles</a>{" "}
         (應該可以翻譯成 "爛 UI 挑戰") 還有一個網頁版的物理實驗引擎的 demo{" "}
-        <a href="https://brm.io/matter-js/">Matter.js</a>
+        <a href="https://brm.io/matter-js/">Matter.js</a> 受到啟發的
       </p>
 
       <p>
