@@ -177,7 +177,7 @@
       this.isStartingNode = false;
 
       // Will be updated when running the animation
-      this.isSleeping = false;
+      this.isStatic = false;
 
       this.cachedID = null;
       this.cachedBoundingBox = null;
@@ -248,8 +248,8 @@
       this.isStartingNode = true;
     }
 
-    setSleeping(isSleeping) {
-      this.isSleeping = isSleeping;
+    setStatic(isStatic) {
+      this.isStatic = isStatic;
     }
 
     setTransform(translation, rotation) {
@@ -821,7 +821,7 @@
 
         this.prevScroll = curScroll;
 
-        this.makeStartingRectanglesSleepIfNotVisible(curScroll);
+        this.makeStartingRectanglesStaticIfNotVisible(curScroll);
 
         // Update physics
         this.applyForceToStartingRectangles();
@@ -836,7 +836,7 @@
       window.requestAnimationFrame(this.stepAnimation.bind(this));
     }
 
-    makeStartingRectanglesSleepIfNotVisible(curScroll) {
+    makeStartingRectanglesStaticIfNotVisible(curScroll) {
       this.treeManager.visualStartingNodes.forEach((startingNode) => {
         const boundingBox = startingNode.getBoundingBox();
         const offset = Matter.Vector.neg(curScroll);
@@ -849,16 +849,16 @@
           offsetBoundingBox,
         );
 
-        if (isVisible && !startingNode.isSleeping) return;
-        if (!isVisible && startingNode.isSleeping) return;
+        if (isVisible && !startingNode.isStatic) return;
+        if (!isVisible && startingNode.isStatic) return;
 
-        // Update sleeping status
-        const newSleeping = !startingNode.isSleeping;
-        startingNode.setSleeping(newSleeping);
+        // Update static status
+        const newStatic = !startingNode.isStatic;
+        startingNode.setStatic(newStatic);
         TreeIterator.iterateVisualChildren(startingNode, (node) => {
           const rectangle = this.nodeIDToRectangle[node.getID()];
-          Matter.Sleeping.set(rectangle, newSleeping);
-          if (newSleeping) node.clearTransform();
+          Matter.Body.setStatic(rectangle, newStatic);
+          if (newStatic) node.clearTransform();
         });
       });
     }
@@ -867,7 +867,7 @@
       const windowAcc = this.smoothWindowAcceleration.getSmoothVector();
 
       this.treeManager.visualStartingNodes.forEach((startingNode) => {
-        if (startingNode.isSleeping) return;
+        if (startingNode.isStatic) return;
 
         const rectangle = this.nodeIDToRectangle[startingNode.getID()];
 
@@ -888,7 +888,7 @@
 
     updateTransformOnVisualNodes() {
       this.treeManager.visualStartingNodes.forEach((startingNode) => {
-        if (startingNode.isSleeping) return;
+        if (startingNode.isStatic) return;
 
         TreeIterator.iterateVisualChildren(startingNode, (node) => {
           const rectangle = this.nodeIDToRectangle[node.getID()];
